@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 from msg_log.mylog import get_logger
-import pandas as pd
+import math
 from datetime import datetime, timedelta
 from typing import Literal
 from decimal import Decimal
@@ -33,8 +33,8 @@ class CSVReader:
     def get_fillna_data(self, filled_date: str):
         """读取用于填充指定网站缺失值的数据"""
         filled_date = (datetime.strptime(filled_date, '%Y-%m-%d %H:%M:%S')) - timedelta(hours=1)
-        filled_data_path = os.path.join(self.base_file_path, f'{filled_date.year}-{filled_date.month}',
-                                        f'{filled_date.day}.csv')
+        filled_data_path = os.path.join(self.base_file_path, f"{filled_date.year}-{filled_date.month}",
+                                        f"{filled_date.day}.csv")
         try:
             target_web_data = pd.read_csv(filled_data_path, low_memory=False, encoding='utf-8', dtype='str')
         except FileNotFoundError:
@@ -59,7 +59,6 @@ class CSVReader:
             target_data = target_data['price'].astype(Decimal)
         except FileNotFoundError:
             logger.warning(f'{target_file_path}文件不存在')
-            make_sure_path_exists(target_file_path)
             target_data = pd.DataFrame()
         return target_data
 

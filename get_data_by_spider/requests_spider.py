@@ -61,6 +61,9 @@ class SpiderByRequests(Spider):
             self.records = self.res_json.get(self.coins_key)
         except KeyError:
             raise KeyNotFound(f'未找到期望的key: {self.coins_key}')
+        except AttributeError as e:
+            logger.exception(e)
+
 
         try:
             price = self.records[0].get(self.price_key)
@@ -69,7 +72,9 @@ class SpiderByRequests(Spider):
                 raise KeyNotFound(f'未找到期望的key: {self.price_key} 或 {self.name_key}')
         except IndexError:
             raise KeyNotFound(f'未找到期望的key: {self.name_key} 或 {self.price_key}')
-
+        except Exception as e:
+            logger.exception(e)
+            return
         # 遍历记录，提取并处理币种和价格数据
         for record in self.records:
             self.process_record(record)

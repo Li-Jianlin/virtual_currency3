@@ -1,7 +1,9 @@
 import random
 import pandas as pd
 from config import SpiderWeb
+from msg_log.mylog import get_logger
 
+logger = get_logger(__name__)
 # 动态加载User-Agent列表
 def load_user_agents():
     user_agents = [
@@ -63,10 +65,10 @@ class Spider:
             return self.coin_data
         try:
             coin_data = pd.DataFrame({'coin_name': self.coins, 'coin_price': self.prices, 'spider_web': self.spider_web})
-            if self.spider_web == 'binance':
+            if self.spider_web == 'binance' or self.spider_web == 'coin-stats':
                 coin_data = coin_data.drop_duplicates(subset='coin_name', keep='last')
             self.coin_data = coin_data
         except Exception as e:
-            logging.error(f"Error creating DataFrame: {e}")
+            logger.error(f"Error creating DataFrame: {e}")
             self.coin_data = pd.DataFrame()
         return self.coin_data
