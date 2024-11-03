@@ -1,17 +1,15 @@
 import logging
 from datetime import datetime
-
+from pandas import DataFrame
+from selenium.common import InvalidArgumentException
 from socks import method
 
 from get_data_by_spider.spider_base import Spider
-from requests_spider import SpiderByRequests
-from selenium_spider import SpiderBySelenium
-from spider_base import SpiderWeb
+from get_data_by_spider.requests_spider import SpiderByRequests
+from get_data_by_spider.selenium_spider import SpiderBySelenium
 from msg_log.mylog import get_logger
-from error_exception.Customerror import KeyNotFound, SpiderFailedError
-from pandas import DataFrame
-
-from config import BLACKLIST_FILEPATH
+from error_exception.customerror import KeyNotFound, SpiderFailedError
+from config import BLACKLIST_FILEPATH, SpiderWeb
 
 # 设置日志
 logger = get_logger(__name__)
@@ -50,12 +48,19 @@ class DataGetter:
             self.spider.get_headless_driver()
             logger.info("加载页面")
             # 提前加载出页面
-            self.load_page()
+            try:
+                self.load_page()
+            except TimeoutException:
+                logger.warning("selenium加载页面超时,重新加载.....")
+                self.load_page()
+            except InvalidArgumentException as e:
+                logger.exception(f'无效参数异常,重新加载\n{e}')
+                self.load_page()
             logger.info("加载页面完成")
         self.blacklist = read_blacklist(BLACKLIST_FILEPATH)
         self.data = DataFrame()
 
-    def get_data(self)-> DataFrame:
+    def get_data(self):
         """获取数据"""
         logger.info("爬取数据")
         if self.method == 'selenium':
@@ -67,6 +72,8 @@ class DataGetter:
         logger.info("数据生成完成,开始过滤黑名单")
         self.filter_data()
         logger.info("黑名单过滤完成")
+        logger.info('\n' + self.data.head(2).to_string() +'\n')
+        return self
 
 
     def get_data_by_selenium(self):
@@ -88,6 +95,9 @@ class DataGetter:
             data = self.spider.coin_data
             data = data[~data['coin_name'].isin(self.blacklist)].copy()
             self.data = data
+        else:
+            logger.warning("数据为空")
+        return self
 
 
 

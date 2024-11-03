@@ -1,10 +1,10 @@
 import requests
 import pandas as pd
 
-from config import CONFIG_JSON
-from get_data_by_spider.spider_base import Spider, SpiderWeb
+from config import CONFIG_JSON, SpiderWeb
+from get_data_by_spider.spider_base import Spider
 from msg_log.mylog import get_logger
-from error_exception.Customerror import KeyNotFound, SpiderFailedError
+from error_exception.customerror import KeyNotFound, SpiderFailedError
 
 
 
@@ -80,7 +80,7 @@ class SpiderByRequests(Spider):
 
         if isinstance(price, str):
             price = price.replace('$', '').replace(',', '')
-            price = round(price, 7)
+
 
         if coin and price:
             self.coins.append(coin)

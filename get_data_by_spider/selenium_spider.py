@@ -1,6 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.chrome.options import Options
@@ -9,8 +10,9 @@ import pandas as pd
 import time
 import random
 
-from config import CONFIG_JSON_SELENIUM
-from get_data_by_spider.spider_base import Spider, SpiderWeb
+from config import CONFIG_JSON_SELENIUM, SpiderWeb
+from get_data_by_spider.spider_base import Spider
+
 
 
 class SpiderBySelenium(Spider):
@@ -38,14 +40,14 @@ class SpiderBySelenium(Spider):
         self.options.add_argument('--hide-scrollbars')  # 隐藏滚动条, 应对一些特殊页面
         self.options.add_argument(
             f'user-agent={self.headers["User-Agent"]}')
-        self.driver = webdriver.Chrome(service=Service(executable_path='chromedriver.exe'), options=self.options)
-        self.wait = WebDriverWait(self.driver, 25)
+        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.options)
+        self.wait = WebDriverWait(self.driver, 30)
         self.driver.get(self.url)
         time.sleep(3)
 
     def get_driver(self):
         """使用有头浏览器"""
-        self.driver = webdriver.Chrome(service=Service(executable_path='chromedriver.exe'))
+        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
         self.wait = WebDriverWait(self.driver, 10)
         self.driver.get(self.url)
         time.sleep(3)
@@ -91,6 +93,9 @@ class SpiderBySelenium(Spider):
 
     def transform_dataframe(self):
         """生成DataFrame数据"""
+        if not self.coins or not self.prices:
+            self.coin_data = pd.DataFrame()
+            return self.coin_data
         try:
             self.coin_data = pd.DataFrame({'coin_name': self.coins, 'coin_price': self.prices, 'spider_web': self.spider_web})
             self.coin_data['coin_price'] = self.coin_data['coin_price']

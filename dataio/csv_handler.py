@@ -20,7 +20,7 @@ def make_sure_path_exists(path):
 class CSVReader:
     """从csv文件中读取想要的数据"""
 
-    def __init__(self, data_region: str, **kwargs):
+    def __init__(self, data_region: str = 'China', **kwargs):
         """
 
         :param data_region:表示地区，China表示国内数据，Foreign表示国际数据
@@ -28,7 +28,7 @@ class CSVReader:
         :param kwargs:
         """
         self.data_region = data_region
-        self.base_file_path = kwargs.get(base_file_path, os.path.join('data', self.data_region))
+        self.base_file_path = kwargs.get('base_file_path', os.path.join('data', self.data_region))
 
     def get_fillna_data(self, filled_date: str):
         """读取用于填充指定网站缺失值的数据"""
@@ -66,8 +66,7 @@ class CSVReader:
     def get_detail_data(self, cur_date: str):
         """获取前一个小时的所有详细数据"""
         cur_datetime = datetime.strptime(cur_date, '%Y-%m-%d %H:%M:%S')
-        detail_data_path = os.path.join(self.base_file_path, f'{cur_datetime.year}-{cur_datetime.month}',
-                                        'detail_data.csv')
+        detail_data_path = os.path.join(self.base_file_path, 'detail_data.csv')
         try:
             detail_data = pd.read_csv(detail_data_path, low_memory=False, encoding='utf-8', dtype='str')
             detail_data = detail_data['price'].astype(Decimal)
@@ -116,9 +115,9 @@ class CSVReader:
 class CSVWriter:
     """向csv中写入数据"""
 
-    def __init__(self, data_region: str):
+    def __init__(self, data_region: str = 'China', **kwargs):
         self.data_region = data_region
-        self.base_file_path = os.path.join('data', self.data_region)
+        self.base_file_path = kwargs.get('base_file_path', os.path.join('data', self.data_region))
         self.is_check = False
 
     def write_data(self, data: pd.DataFrame, unit_time: Literal['hour', 'day']):
@@ -143,7 +142,7 @@ class CSVWriter:
         """将当前爬取的详细数据写入到detail_data文件中"""
         cur_time = data.iloc[0]['time']
         cur_datetime = datetime.strptime(cur_time, '%Y-%m-%d %H:%M:%S')
-        target_file_folder = os.path.join(self.base_file_path, f'{cur_datetime.year}-{cur_datetime.month}')
+        target_file_folder = self.base_file_path
         make_sure_path_exists(target_file_folder)
         target_file_name = f'detail_data.csv'
         target_file_path = os.path.join(target_file_folder, target_file_name)
@@ -153,9 +152,9 @@ class CSVWriter:
             if os.path.exists(target_file_path):
                 checked_data = pd.read_csv(target_file_path, low_memory=False, encoding='utf-8')
                 # 不是当前时刻的数据则删除
-                file_time = checked_data.iloc[-1]['time']
+                file_time = checked_data.iloc[0]['time']
                 file_datetime = datetime.strptime(file_time, '%Y-%m-%d %H:%M:%S')
-                if file_datetime.hour != cur_datetime.hour and file_datetime.day != cur_datetime.day:
+                if file_datetime.hour != cur_datetime.hour:
                     logger.info(f'{target_file_path}文件中存在非当前时刻数据，删除文件重新写入')
                     os.remove(target_file_path)
             self.is_check = True
@@ -166,6 +165,14 @@ class CSVWriter:
             data.to_csv(target_file_path, mode='a', header=False, index=False, encoding='utf-8')
         logger.info(f'写入{data.iloc[0]["spider_web"]}网站数据成功')
 
+    def write_statistical_table(self, statictical_table, unit_time: Literal['hour', 'day']):
+        """将表写回文件"""
+        if unit_time == 'hour':
+            target_file_name = 'statistical_table_hour.csv'
+        else:
+            target_file_name = 'statistical_table_day.csv'
+        target_file_path = os.path.join(self.base_file_path, target_file_name)
+        statictical_table.to_csv(target_file_path, index=False, encoding='utf-8')
 
 if __name__ == '__main__':
     file_path = '../data/China/2020-05'
@@ -173,6 +180,10 @@ if __name__ == '__main__':
     df = pd.DataFrame({'coin': ['a', 'b'], 'time': ['2020-05-01 01:01:01', '2020-05-01 01:01:01'],
                        'spider_web': ['binance', 'binance']})
     writer = CSVWriter('China')
+    print(writer.base_file_path)
+    writer.data_region = 'Foreign'
+    print(writer.base_file_path)
     writer.write_data(df, 'hour')
     writer.write_detail_data(df)
     pass
+

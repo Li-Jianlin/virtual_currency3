@@ -1,13 +1,7 @@
 import random
 import pandas as pd
-from enum import Enum
+from config import SpiderWeb
 
-class SpiderWeb(Enum):
-    COIN_GLASS = 'coin_glass'
-    _528_btc = '528_btc'
-    INVERSTING = 'inversting'
-    BINANCE = 'binance'
-    COIN_STATS = 'coin-stats'
 # 动态加载User-Agent列表
 def load_user_agents():
     user_agents = [
@@ -42,7 +36,7 @@ class Spider:
     爬虫的基类
     url: 当前要爬取的网址
     headers: 请求头。模拟浏览器避免被识别为爬虫
-    time: 获取数据时的时间
+    datetime: 获取数据时的时间
     coins: 存储获取的币种
     prices: 存储获取的价格
     """
@@ -64,9 +58,14 @@ class Spider:
 
     def transform_dataframe(self):
         """生成DataFrame数据"""
+        if not self.coins:
+            self.coin_data = pd.DataFrame()
+            return self.coin_data
         try:
-            self.coin_data = pd.DataFrame({'coin_name': self.coins, 'coin_price': self.prices, 'spider_web': self.spider_web})
-            self.coin_data['coin_price'] = self.coin_data['coin_price'].astype(float)
+            coin_data = pd.DataFrame({'coin_name': self.coins, 'coin_price': self.prices, 'spider_web': self.spider_web})
+            if self.spider_web == 'binance':
+                coin_data = coin_data.drop_duplicates(subset='coin_name', keep='last')
+            self.coin_data = coin_data
         except Exception as e:
             logging.error(f"Error creating DataFrame: {e}")
             self.coin_data = pd.DataFrame()

@@ -1,14 +1,13 @@
 import logging
 import datetime
 import logging.handlers
-from inspect import stack
-
+import os
 # 定义日志格式
 LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s - %(pathname)s:%(lineno)d"
 # 定义日期格式
 DATE_FORMAT = "%m/%d/%Y %H:%M:%S"
 
-def get_logger(name):
+def get_logger(name, **kwargs):
     """
     创建并返回一个自定义的日志记录器。
 
@@ -30,11 +29,12 @@ def get_logger(name):
     stdoutHandler = logging.StreamHandler()
     # 创建一个输出到文件的日志处理器，文件路径为 '../mylog.log'
     rf_handler = logging.handlers.TimedRotatingFileHandler(
-        f'../log/{name}_log.log',  # 日志文件名称
+        filename=kwargs.get('log_path', os.path.join('log', f'{name}.log')),  # 日志文件名称
         when='midnight',  # 每天午夜滚动日志文件
         interval=1,  # 每 1 天滚动一次
-        backupCount=7,  # 保留最近 7 个备份文件
-        atTime=datetime.time(0, 15, 30, 0)  # 每天 00:15:30 滚动
+        backupCount=2,  # 保留最近 7 个备份文件
+        atTime=datetime.time(0, 15, 30, 0),  # 每天 00:15:30 滚动
+        encoding='utf-8'
     )
 
     # 设置标准输出和文件输出的日志级别为 WARNING

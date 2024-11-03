@@ -1,9 +1,18 @@
+from enum import Enum
 HOST = 'localhost'
 PORT = 3306
 USERNAME = 'root'
 PASSWORD = '123123'
 DB = 'td1'
 DB_URI = f'mysql+pymysql://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{DB}'
+
+
+class SpiderWeb(Enum):
+    COIN_GLASS = 'coin_glass'
+    _528_btc = '528_btc'
+    INVERSTING = 'inversting'
+    BINANCE = 'binance'
+    COIN_STATS = 'coin-stats'
 
 CONFIG_JSON = {
     'coin-stats': {
@@ -45,4 +54,4 @@ CONFIG_JSON_SELENIUM = {
     }
 }
 
-BLACKLIST_FILEPATH = '../data/blacklist.csv'
+BLACKLIST_FILEPATH = 'data/blacklist.csv'
