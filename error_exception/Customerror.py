@@ -13,3 +13,10 @@ class SpiderFailedError(Exception):
     """
     def __init__(self, message="爬取失败"):
         super().__init__(message)
+
+class DataNotExistError(Exception):
+    """
+    数据不存在时引发的异常
+    """
+    def __init__(self, message="数据不存在"):
+        super().__init__(message)

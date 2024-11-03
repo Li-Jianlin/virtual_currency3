@@ -4,7 +4,7 @@ import pandas as pd
 from config import CONFIG_JSON
 from get_data_by_spider.spider_base import Spider, SpiderWeb
 from msg_log.mylog import get_logger
-from error_exception.keyerror import KeyNotFound, SpiderFailedError
+from error_exception.Customerror import KeyNotFound, SpiderFailedError
 
 
 
@@ -79,7 +79,7 @@ class SpiderByRequests(Spider):
         price = record.get(self.price_key)
 
         if isinstance(price, str):
-            price = float(price.replace('$', '').replace(',', ''))
+            price = price.replace('$', '').replace(',', '')
             price = round(price, 7)
 
         if coin and price:

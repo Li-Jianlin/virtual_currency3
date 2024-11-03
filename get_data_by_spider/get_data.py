@@ -8,7 +8,7 @@ from requests_spider import SpiderByRequests
 from selenium_spider import SpiderBySelenium
 from spider_base import SpiderWeb
 from msg_log.mylog import get_logger
-from error_exception.keyerror import KeyNotFound, SpiderFailedError
+from error_exception.Customerror import KeyNotFound, SpiderFailedError
 from pandas import DataFrame
 
 from config import BLACKLIST_FILEPATH
@@ -40,7 +40,8 @@ class DataGetter:
     }
     def __init__(self, spider_web: SpiderWeb, **kwargs):
         self.method = self.spider_method.get(spider_web)
-        logger.info(f"创建爬取{spider_web.value}网站的对象")
+        self.spider_web_name = spider_web.value
+        logger.info(f"创建爬取{self.spider_web_name}网站的对象")
         if self.method == 'requests':
             self.spider = SpiderByRequests(spider_web)
         elif self.method == 'selenium':

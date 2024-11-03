@@ -93,7 +93,7 @@ class SpiderBySelenium(Spider):
         """生成DataFrame数据"""
         try:
             self.coin_data = pd.DataFrame({'coin_name': self.coins, 'coin_price': self.prices, 'spider_web': self.spider_web})
-            self.coin_data['coin_price'] = self.coin_data['coin_price'].astype(float)
+            self.coin_data['coin_price'] = self.coin_data['coin_price']
             if self.spider_web == SpiderWeb.COIN_GLASS.value:
                 self.coin_data = self.coin_data[self.coin_data['coin_name'].str.endswith('/USDT')]
                 self.coin_data['coin_name'] = self.coin_data['coin_name'].replace('/USDT', '', regex=True)
