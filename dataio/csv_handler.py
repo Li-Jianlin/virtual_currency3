@@ -5,8 +5,8 @@ import math
 from datetime import datetime, timedelta
 from typing import Literal
 from decimal import Decimal
-from config import PROJECT_ROOT_PATH
 
+PROJECT_ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', f'csv_handler.log' ))
 
 

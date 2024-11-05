@@ -11,10 +11,10 @@ if not os.path.exists(base_folder):
 from get_data_by_spider.get_data import DataGetter
 from dataio.csv_handler import CSVReader, CSVWriter
 from data_process.data_process import DataProcess
-from config import SpiderWeb, PROJECT_ROOT_PATH
+from config import SpiderWeb
 from msg_log.mylog import get_logger
 
-# PROJECT_ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', 'controll.log'))
 
 

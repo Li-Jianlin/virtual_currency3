@@ -1,11 +1,11 @@
 import requests
 import os
-from config import CONFIG_JSON, SpiderWeb, PROJECT_ROOT_PATH
+from config import CONFIG_JSON, SpiderWeb
 from get_data_by_spider.spider_base import Spider
 from msg_log.mylog import get_logger
 from error_exception.customerror import KeyNotFound, SpiderFailedError
 
-
+PROJECT_ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', f'requests_spider.log'))
 
 

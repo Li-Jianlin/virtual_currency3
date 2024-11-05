@@ -12,10 +12,11 @@ import time
 import random
 import os
 from msg_log.mylog import get_logger
-from config import CONFIG_JSON_SELENIUM, SpiderWeb, PROJECT_ROOT_PATH
+from config import CONFIG_JSON_SELENIUM, SpiderWeb
 from get_data_by_spider.spider_base import Spider
 from decimal import Decimal
 
+PROJECT_ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 logging = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', f'selenium_spider.log'))
 
 

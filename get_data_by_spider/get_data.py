@@ -8,8 +8,8 @@ from get_data_by_spider.requests_spider import SpiderByRequests
 from get_data_by_spider.selenium_spider import SpiderBySelenium
 from msg_log.mylog import get_logger
 from error_exception.customerror import KeyNotFound, SpiderFailedError
-from config import BLACKLIST_FILEPATH, SpiderWeb, PROJECT_ROOT_PATH
-
+from config import BLACKLIST_FILEPATH, SpiderWeb
+PROJECT_ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 设置日志
 logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', f'get_data.log'))
 

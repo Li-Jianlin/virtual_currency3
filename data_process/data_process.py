@@ -10,10 +10,8 @@ import os
 from dataio.csv_handler import CSVReader, CSVWriter
 from msg_log.mylog import get_logger
 from error_exception.customerror import DataNotExistError
-from config import PROJECT_ROOT_PATH
 
-os.path.dirname(os.path.abspath(__file__))
-
+PROJECT_ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', 'data_process.log'))
 
 

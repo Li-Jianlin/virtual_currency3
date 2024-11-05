@@ -2,8 +2,8 @@ import os
 import random
 import pandas as pd
 from msg_log.mylog import get_logger
-from config import PROJECT_ROOT_PATH
 
+PROJECT_ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', f'spider_base.log'))
 # 动态加载User-Agent列表
 def load_user_agents():
