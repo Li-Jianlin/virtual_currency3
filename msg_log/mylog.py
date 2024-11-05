@@ -29,7 +29,7 @@ def get_logger(name, **kwargs):
     stdoutHandler = logging.StreamHandler()
     # 创建一个输出到文件的日志处理器，文件路径为 '../mylog.log'
     rf_handler = logging.handlers.TimedRotatingFileHandler(
-        filename=kwargs.get('log_path', os.path.join('log', f'{name}.log')),  # 日志文件名称
+        filename=kwargs.get('filename', os.path.join('log', f'{name}.log')),  # 日志文件名称
         when='midnight',  # 每天午夜滚动日志文件
         interval=1,  # 每 1 天滚动一次
         backupCount=2,  # 保留最近 7 个备份文件

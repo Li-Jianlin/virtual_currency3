@@ -1,36 +1,28 @@
+import os
 from typing import Literal
 import pandas as pd
-from urllib3.filepost import writer
 from threading import  Thread, Lock
-from get_data_by_spider.get_data import DataGetter
 from datetime import datetime, timedelta
+
+base_folder = os.path.join(os.path.dirname(__file__), 'log')
+if not os.path.exists(base_folder):
+    os.makedirs(base_folder, exist_ok=True)
+
+from get_data_by_spider.get_data import DataGetter
 from dataio.csv_handler import CSVReader, CSVWriter
 from data_process.data_process import DataProcess
-from config import SpiderWeb
+from config import SpiderWeb, PROJECT_ROOT_PATH
 from msg_log.mylog import get_logger
-import os
 
-logger = get_logger(__name__, log_path=os.path.join('log', 'main.log'))
-
-
-class ChinaData():
-    """国内数据"""
-
-    def __init__(self):
-        self.data_region = 'China'
-        self.datetime = datetime.now()
-
-
-class ForeignData():
-    """国际数据"""
-    pass
+# PROJECT_ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
+logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', 'controll.log'))
 
 
 class ProgramCotroller:
     """整个程序的控制类"""
     base_file_path = {
-        'China': os.path.join('data', 'China'),
-        'Foreign': os.path.join('data', 'Foreign')
+        'China': os.path.join(PROJECT_ROOT_PATH, 'data', 'China'),
+        'Foreign': os.path.join(PROJECT_ROOT_PATH, 'data', 'Foreign')
     }
 
     def __init__(self, data_region: Literal['China', 'Foreign'], **kwargs):
@@ -80,6 +72,7 @@ class ProgramCotroller:
     def get_data_by_multithreading(self):
         self.threads = []
         self.res = []
+        name = ['coin-stats', 'binance']
         for cur_getter in (self.inversting_data_getter, self.binance_data_getter):
             thread = Thread(target=self.get_data, args=(cur_getter,), daemon=True)
             self.threads.append(thread)

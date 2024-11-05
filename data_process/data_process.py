@@ -2,70 +2,93 @@ import numpy as np
 import pandas as pd
 from typing import Literal
 from decimal import Decimal
-from numpy.ma.core import filled
 from pandas import DataFrame
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
+import os
 
 from dataio.csv_handler import CSVReader, CSVWriter
 from msg_log.mylog import get_logger
 from error_exception.customerror import DataNotExistError
-logger = get_logger(__name__)
+from config import PROJECT_ROOT_PATH
+
+os.path.dirname(os.path.abspath(__file__))
+
+logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', 'data_process.log'))
 
 
 class DataProcess:
     """对数据进行各种处理，例如缺失值处理、重复值删除、跌涨幅、最高/最低价计算等操作"""
 
-    def __init__(self, data: DataFrame, data_region: Literal['China', 'Foreign'], unit_time: Literal['hour', 'day'], **kwargs):
+    def __init__(self, data: DataFrame, data_region: Literal['China', 'Foreign'], unit_time: Literal['hour', 'day'],
+                 **kwargs):
+        self.previous_all_data = None
+        self.detail_data = None
+        self.combined_data = None
+        self.statistics_table = None
         self.data = data
-
-        self.csv_reader = kwargs.get('reader', CSVReader(data_region))
-        self.csv_writer = kwargs.get('writer', CSVWriter(data_region))
+        default_base_file_path = os.path.join(PROJECT_ROOT_PATH, 'data', data_region)
+        self.csv_reader = kwargs.get('reader', CSVReader(data_region, base_file_path=kwargs.get('base_file_path',
+                                                                                                default_base_file_path)))
+        self.csv_writer = kwargs.get('writer', CSVWriter(data_region, base_file_path=kwargs.get('base_file_path',
+                                                                                                default_base_file_path)))
 
         self.time = kwargs.get('time', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         self.unit_time = unit_time
-        self.method = kwargs.get('method', 'ffill')
-
 
     def get_needed_data(self):
         """获取后续处理需要的数据"""
-        self.previous_all_data = self.csv_reader.get_previous_all_data(self.time, self.unit_time)
-        if self.previous_all_data.empty:
-            logger.warning(f'{self.time}之前没有数据')
-        else:
-            self.previous_all_data = self.previous_all_data[
-                slef.previous_all_data['coin_name'].isin(self.data['coin_name'])]
-
+        self.data['coin_price'] = self.data['coin_price'].apply(Decimal)
+        self.data = self.data[self.data['coin_price'] != 0]
         self.detail_data = self.csv_reader.get_detail_data(self.time)
-        if self.detail_data.empty:
-            logger.warning(f'{self.time}没有详细数据，无法计算')
-            self.detail_data = self.data
-
-        self.combined_data = pd.concat([self.previous_all_data, self.data], ignore_index=False)
         self.statistics_table = self.csv_reader.get_statistical_table(self.unit_time)
+
+        if self.detail_data.empty:
+            # self.detail_data = self.detail_data[self.detail_data['coin_name'].isin(self.data['coin_name'])]
+            logger.warning(f'{self.time}没有详细数据，无法计算')
+
+        if self.unit_time == 'hour':
+            self.combined_data = pd.concat([self.data, self.detail_data], ignore_index=True)
+        else:
+            self.previous_all_data = self.csv_reader.get_previous_all_data(self.time, 'hour')
+            if self.previous_all_data.empty:
+                logger.warning(f'{self.time}之前没有数据')
+                # 没有小时数据
+                self.previous_all_data = pd.DataFrame()
+            self.combined_data = self.previous_all_data
+
+        self.combined_data.drop_duplicates(inplace=True)
+        self.combined_data = self.combined_data[self.combined_data['coin_name'].isin(self.data['coin_name'])]
         return self
 
     def fill_na(self):
         """缺失值填充"""
-        self.data = self.data[self.data['price'] != 0]
-        self.data = self.data['price'].astype(Decimal)
-        filled_data = self.combined_data.groupby(['coin_name', 'spider_web']).apply(
-            lambda group: group.fillna(method=self.method)).reset_index(drop=True)
+
+        filled_data = self.combined_data.groupby(['coin_name', 'spider_web'])[['coin_price', 'time']].apply(
+            lambda group: group.ffill()).reset_index(drop=False).set_index('level_2')
         lasted_data = filled_data.sort_values('time').groupby(['coin_name', 'spider_web']).tail(1)
         self.data = lasted_data
         return self
 
     def get_price_columns(self):
         """获取最高、最低、开盘、收盘价"""
-        if self.unit_time == 'hour':
-            data_for_calculate_columns = self.detail_data
-            data_for_calculate_columns = pd.concat([data_for_calculate_columns, self.data], ignore_index=False)
-        else:
-            data_for_calculate_columns = self.combined_data
-        self.data['higt'] = self.data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['price'].transform('max')
-        self.data['low'] = self.data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['price'].transform('min')
-        self.data['open'] = self.data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['price'].transform('first')
-        self.data['close'] = self.data['price']
+        data_for_calculate_columns = self.combined_data.copy().sort_values('time', ascending=True)
+        # 设置 data 的索引
+        data = self.data.copy().set_index(['coin_name', 'spider_web'])
+        # data_for_calculate_columns = data_for_calculate_columns.set_index(['coin_name', 'spider_web'])
+        # 设置 data 的索引
+        data = self.data.copy().set_index(['coin_name', 'spider_web'])
+
+        data['high'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('max')
+
+        # 同理可得低价、开盘价和收盘价
+        data['low'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('min')
+        data['open'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('first')
+
+        # 将 'close' 列直接从 `self.data` 获取并赋值
+        data['close'] = data['coin_price']
+        self.data = data.reset_index()
+        del data
         return self
 
     def calculate_change_rate(self):
@@ -75,40 +98,57 @@ class DataProcess:
 
     def calculate_amplitude(self):
         """计算振幅"""
-        self.data['amplitude'] = (self.data['higt'] - self.data['low']) / self.data['open'] * 100
+        self.data['amplitude'] = (self.data['high'] - self.data['low']) / self.data['open'] * 100
         return self
 
     def calculate_virtual_drop(self):
         """计算虚降"""
         self.data['virtual_drop'] = self.data.apply(lambda x: (x['open'] - x['low']) / x['open'] * 100 \
-            if x['change'] >= 0 else (x['close'] - x['low']) / x['open'] * 100)
+            if x['change'] >= 0 else (x['close'] - x['low']) / x['open'] * 100, axis=1)
         return self
 
     def update_statistics_table(self):
         """更新统计表信息"""
-        to_be_merged_data = self.data[['high','low', 'coin_name', 'spider_web']]
-        to_be_merged_data = to_be_merged_data.rename({'high': f"{self.time}_high", 'low': f"{self.time}_low"})
+        to_be_merged_data = self.data[['high', 'low', 'coin_name', 'spider_web']]
+        to_be_merged_data = to_be_merged_data.rename(columns={'high': f"{self.time}_high", 'low': f"{self.time}_low"})
         if not self.statistics_table.empty:
             # 删除第一列
-            self.statistics_table = self.statistics_table.drop(self.statistics_table.columns[2:4], axis=1)
-            self.statistics_table = self.statistics_table.merge(to_be_merged_data, how='outer', on=['coin_name', 'spider_web'])
+            self.statistics_table = self.statistics_table.reindex(columns=['coin_name', 'spider_web'] + sorted(
+                self.statistics_table.columns.difference(['coin_name', 'spider_web'])))
+
+            # self.statistics_table = self.statistics_table.drop(self.statistics_table.columns[2:4], axis=1)
+            self.statistics_table = self.statistics_table.merge(to_be_merged_data, how='outer',
+                                                                on=['coin_name', 'spider_web'])
         else:
             self.statistics_table = to_be_merged_data
-        writer.write_statistical_table(self.statistics_table, self.unit_time)
+            self.statistics_table = self.statistics_table.reindex(columns=['coin_name', 'spider_web'] + sorted(
+                self.statistics_table.columns.difference(['coin_name', 'spider_web'])))
+        self.csv_writer.write_statistical_table(self.statistics_table, self.unit_time)
         return self
 
     # 计算
     def calculate_all(self):
-        self.fill_na()
-        self.get_price_columns()
-        self.calculate_change_rate()
-        self.calculate_amplitude()
-        self.calculate_virtual_drop()
-        self.update_statistics_table()
-
-
+        if self.unit_time == 'hour':
+            self.fill_na()
+        self.get_price_columns().calculate_change_rate().calculate_amplitude().calculate_virtual_drop().update_statistics_table()
 
 
 if __name__ == '__main__':
-    da = DataProcess(pd.DataFrame(), 'China')
-    da.fill_na()
+    try:
+        # data = pd.DataFrame({
+        #     'coin_name': ['BTC', 'ETH', 'USDT', 'BTC', 'ETH', 'USDT'],
+        #     'coin_price': [str(68218.00), str(2443.51), str(34.20), str(68218.00), str(2443.51), str(34.20)],
+        #     'spider_web': ['binance', 'binance', 'binance', 'coin-stats', 'coin-stats', 'coin-stats'],
+        #     'time': ['2024-11-04 01:00:00', '2024-11-04 01:00:00', '2024-11-04 01:00:00', '2024-11-04 01:00:00',
+        #              '2024-11-04 01:00:00', '2024-11-04 01:00:00']
+        # })
+        data = pd.read_csv('../data_00.csv', encoding='utf-8', dtype={'coin_price': str})
+        data['coin_price'] = data['coin_price'].apply(Decimal)
+        da = DataProcess(data, 'China', unit_time='day', time='2024-11-05 00:00:00',
+                         )
+        da.get_needed_data()
+        da.calculate_all()
+
+        pass
+    except KeyboardInterrupt:
+        print('程序被用户终止')

@@ -1,19 +1,17 @@
 import logging
 from datetime import datetime
 from pandas import DataFrame
-from selenium.common import InvalidArgumentException
+from selenium.common import InvalidArgumentException, TimeoutException
 from socks import method
-
-from get_data_by_spider.spider_base import Spider
+import os
 from get_data_by_spider.requests_spider import SpiderByRequests
 from get_data_by_spider.selenium_spider import SpiderBySelenium
 from msg_log.mylog import get_logger
 from error_exception.customerror import KeyNotFound, SpiderFailedError
-from config import BLACKLIST_FILEPATH, SpiderWeb
+from config import BLACKLIST_FILEPATH, SpiderWeb, PROJECT_ROOT_PATH
 
 # 设置日志
-logger = get_logger(__name__)
-
+logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', f'get_data.log'))
 
 
 def read_blacklist(file_path):
@@ -113,4 +111,4 @@ if __name__ == '__main__':
         if cur_time.second == 0:
             data_getter.get_data()
             print(data_getter.data)
-    logger.info('爬取完成')
+

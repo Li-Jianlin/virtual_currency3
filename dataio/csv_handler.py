@@ -5,7 +5,9 @@ import math
 from datetime import datetime, timedelta
 from typing import Literal
 from decimal import Decimal
-logger = get_logger(__name__)
+from config import PROJECT_ROOT_PATH
+
+logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', f'csv_handler.log' ))
 
 
 def make_sure_path_exists(path):
@@ -28,7 +30,7 @@ class CSVReader:
         :param kwargs:
         """
         self.data_region = data_region
-        self.base_file_path = kwargs.get('base_file_path', os.path.join('data', self.data_region))
+        self.base_file_path = kwargs.get('base_file_path', os.path.join(PROJECT_ROOT_PATH, 'data', self.data_region))
 
     def get_fillna_data(self, filled_date: str):
         """读取用于填充指定网站缺失值的数据"""
@@ -56,7 +58,7 @@ class CSVReader:
                                         target_file_name)
         try:
             target_data = pd.read_csv(target_file_path, low_memory=False, encoding='utf-8', dtype='str')
-            target_data = target_data['price'].astype(Decimal)
+            target_data['coin_price'] = target_data['coin_price'].apply(Decimal)
         except FileNotFoundError:
             logger.warning(f'{target_file_path}文件不存在')
             target_data = pd.DataFrame()
@@ -64,11 +66,10 @@ class CSVReader:
 
     def get_detail_data(self, cur_date: str):
         """获取前一个小时的所有详细数据"""
-        cur_datetime = datetime.strptime(cur_date, '%Y-%m-%d %H:%M:%S')
         detail_data_path = os.path.join(self.base_file_path, 'detail_data.csv')
         try:
             detail_data = pd.read_csv(detail_data_path, low_memory=False, encoding='utf-8', dtype='str')
-            detail_data = detail_data['price'].astype(Decimal)
+            detail_data['coin_price'] = detail_data['coin_price'].apply(Decimal)
         except FileNotFoundError:
             logger.warning(f'{detail_data_path}文件不存在')
             detail_data = pd.DataFrame()
@@ -88,14 +89,13 @@ class CSVReader:
         for file_path in file_path_list:
             try:
                 target_data = pd.read_csv(file_path, low_memory=False, encoding='utf-8', dtype='str')
-                target_data = target_data['price'].astype(Decimal)
+                target_data['coin_price'] = target_data['coin_price'].apply(Decimal)
             except FileNotFoundError:
                 logger.warning(f'{file_path}文件不存在')
                 target_data = pd.DataFrame()
             else:
                 combined_data = pd.concat([combined_data, target_data], axis=0, ignore_index=True)
         return combined_data
-
     def get_statistical_table(self, unit_time: Literal['hour', 'day']):
         """获取n小时或n天的统计数据。"""
         if unit_time == 'hour':
@@ -116,7 +116,7 @@ class CSVWriter:
 
     def __init__(self, data_region: str = 'China', **kwargs):
         self.data_region = data_region
-        self.base_file_path = kwargs.get('base_file_path', os.path.join('data', self.data_region))
+        self.base_file_path = kwargs.get('base_file_path', os.path.join(PROJECT_ROOT_PATH, 'data', self.data_region))
         self.is_check = False
 
     def write_data(self, data: pd.DataFrame, unit_time: Literal['hour', 'day']):
@@ -162,7 +162,7 @@ class CSVWriter:
             data.to_csv(target_file_path, index=False, encoding='utf-8')
         else:
             data.to_csv(target_file_path, mode='a', header=False, index=False, encoding='utf-8')
-        logger.info(f'写入{data.iloc[0]["spider_web"]}网站数据成功')
+        logger.info(f'写入详细数据成功-{self.data_region}')
 
     def write_statistical_table(self, statictical_table, unit_time: Literal['hour', 'day']):
         """将表写回文件"""

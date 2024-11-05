@@ -6,13 +6,17 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.action_chains import ActionChains
+
 import pandas as pd
 import time
 import random
-
-from config import CONFIG_JSON_SELENIUM, SpiderWeb
+import os
+from msg_log.mylog import get_logger
+from config import CONFIG_JSON_SELENIUM, SpiderWeb, PROJECT_ROOT_PATH
 from get_data_by_spider.spider_base import Spider
+from decimal import Decimal
 
+logging = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', f'selenium_spider.log'))
 
 
 class SpiderBySelenium(Spider):
@@ -98,7 +102,6 @@ class SpiderBySelenium(Spider):
             return self.coin_data
         try:
             self.coin_data = pd.DataFrame({'coin_name': self.coins, 'coin_price': self.prices, 'spider_web': self.spider_web})
-            self.coin_data['coin_price'] = self.coin_data['coin_price']
             if self.spider_web == SpiderWeb.COIN_GLASS.value:
                 self.coin_data = self.coin_data[self.coin_data['coin_name'].str.endswith('/USDT')]
                 self.coin_data['coin_name'] = self.coin_data['coin_name'].replace('/USDT', '', regex=True)

@@ -1,9 +1,10 @@
+import os
 import random
 import pandas as pd
-from config import SpiderWeb
 from msg_log.mylog import get_logger
+from config import PROJECT_ROOT_PATH
 
-logger = get_logger(__name__)
+logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', f'spider_base.log'))
 # 动态加载User-Agent列表
 def load_user_agents():
     user_agents = [

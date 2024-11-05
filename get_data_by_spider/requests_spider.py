@@ -1,14 +1,12 @@
 import requests
-import pandas as pd
-
-from config import CONFIG_JSON, SpiderWeb
+import os
+from config import CONFIG_JSON, SpiderWeb, PROJECT_ROOT_PATH
 from get_data_by_spider.spider_base import Spider
 from msg_log.mylog import get_logger
 from error_exception.customerror import KeyNotFound, SpiderFailedError
 
 
-
-logger = get_logger(__name__)
+logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', f'requests_spider.log'))
 
 
 
@@ -49,6 +47,7 @@ class SpiderByRequests(Spider):
 
         except requests.exceptions.RequestException as e:
             logger.exception(f'请求失败: {e}')
+
         except ValueError as value_err:
             logger.exception(f'{self.url} 返回的内容不是 JSON 格式: {value_err}')
         except Exception as e:

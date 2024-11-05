@@ -1,4 +1,6 @@
 from enum import Enum
+import sys
+import os
 HOST = 'localhost'
 PORT = 3306
 USERNAME = 'root'
@@ -6,6 +8,7 @@ PASSWORD = '123123'
 DB = 'td1'
 DB_URI = f'mysql+pymysql://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{DB}'
 
+PROJECT_ROOT_PATH = r'D:\PythonCode\virtual_currency-3.0'
 
 class SpiderWeb(Enum):
     COIN_GLASS = 'coin_glass'
