@@ -36,7 +36,7 @@ class CSVReader:
         self.base_file_path = kwargs.get('base_file_path', os.path.join(PROJECT_ROOT_PATH, 'data', self.data_region))
     @staticmethod
     def change_data_type(data: pd.DataFrame, only_price: bool = True):
-        """将数据中的数据类型转换为Decimal"""
+        """将数据中数据列的数据类型转换为Decimal"""
         if only_price:
             data['coin_price'] = data['coin_price'].apply(Decimal)
         else:
