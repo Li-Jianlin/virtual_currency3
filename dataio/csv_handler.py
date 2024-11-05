@@ -1,5 +1,8 @@
 import pandas as pd
 import os
+
+from requests.packages import target
+
 from msg_log.mylog import get_logger
 import math
 from datetime import datetime, timedelta
@@ -31,6 +34,22 @@ class CSVReader:
         """
         self.data_region = data_region
         self.base_file_path = kwargs.get('base_file_path', os.path.join(PROJECT_ROOT_PATH, 'data', self.data_region))
+    @staticmethod
+    def change_data_type(data: pd.DataFrame, only_price: bool = True):
+        """将数据中的数据类型转换为Decimal"""
+        if only_price:
+            data['coin_price'] = data['coin_price'].apply(Decimal)
+        else:
+            data['coin_price'] = data['coin_price'].apply(Decimal)
+            data['high'] = data['high'].apply(Decimal)
+            data['low'] = data['low'].apply(Decimal)
+            data['open'] = data['open'].apply(Decimal)
+            data['close'] = data['close'].apply(Decimal)
+            data['change'] = data['change'].apply(Decimal)
+            data['amplitude'] = data['amplitude'].apply(Decimal)
+            data['virtual_drop'] = data['virtual_drop'].apply(Decimal)
+
+        return data
 
     def get_fillna_data(self, filled_date: str):
         """读取用于填充指定网站缺失值的数据"""
@@ -58,7 +77,7 @@ class CSVReader:
                                         target_file_name)
         try:
             target_data = pd.read_csv(target_file_path, low_memory=False, encoding='utf-8', dtype='str')
-            target_data['coin_price'] = target_data['coin_price'].apply(Decimal)
+            target_data = self.change_data_type(target_data, only_price=False)
         except FileNotFoundError:
             logger.warning(f'{target_file_path}文件不存在')
             target_data = pd.DataFrame()
@@ -69,14 +88,18 @@ class CSVReader:
         detail_data_path = os.path.join(self.base_file_path, 'detail_data.csv')
         try:
             detail_data = pd.read_csv(detail_data_path, low_memory=False, encoding='utf-8', dtype='str')
-            detail_data['coin_price'] = detail_data['coin_price'].apply(Decimal)
+            detail_data = self.change_data_type(detail_data, only_price=True)
         except FileNotFoundError:
             logger.warning(f'{detail_data_path}文件不存在')
             detail_data = pd.DataFrame()
         return detail_data
 
-    def get_data_between_hours(self, start_time: str, end_time: str):
-        """根据起始和终止时间读取数据"""
+    def get_data_between_hours(self, start_time: str, end_time: str, inclusive: Literal["both", "neither", "left", "right"] = "both" ):
+        """根据起始和终止时间读取数据
+        :param start_time:
+        :param end_time:
+        :param inclusive: 决定选择文件的边界。both:[], left:[), right: (], neither: ()
+        """
         start_datetime = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
         end_datetime = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
         delta_time = math.ceil((end_datetime - start_datetime).total_seconds() / 3600)
@@ -89,13 +112,17 @@ class CSVReader:
         for file_path in file_path_list:
             try:
                 target_data = pd.read_csv(file_path, low_memory=False, encoding='utf-8', dtype='str')
-                target_data['coin_price'] = target_data['coin_price'].apply(Decimal)
+                target_data = self.change_data_type(target_data, only_price=False)
+
             except FileNotFoundError:
                 logger.warning(f'{file_path}文件不存在')
                 target_data = pd.DataFrame()
             else:
                 combined_data = pd.concat([combined_data, target_data], axis=0, ignore_index=True)
+        if not combined_data.empty:
+            combined_data = combined_data[combined_data['time'].between(start_time, end_time, inclusive=inclusive)]
         return combined_data
+
     def get_statistical_table(self, unit_time: Literal['hour', 'day']):
         """获取n小时或n天的统计数据。"""
         if unit_time == 'hour':
