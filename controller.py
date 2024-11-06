@@ -157,10 +157,12 @@ while True:
 
         # 国际0点（国内8点）
         if cur_datetime.hour == 8 and controller.cur_minute == 0:
+            logger.info('计算国际0点数据')
             controller.change_data_region('Foreign')
             controller.change_data_processer(data=foreign_data.copy(), time=controller.foreign_time,
                                                                unit_time='day')
             calculated_data_foreign_day = controller.calculate_data()
+            logger.info('计算完成，写入数据')
             controller.writer.write_data(calculated_data_foreign_day, unit_time='day')
 
         # 不是整点

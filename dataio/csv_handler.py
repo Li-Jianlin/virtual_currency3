@@ -104,7 +104,7 @@ class CSVReader:
         end_datetime = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
         delta_time = math.ceil((end_datetime - start_datetime).total_seconds() / 3600)
         file_count = math.floor(delta_time / 24)
-        datetime_list = [start_datetime - timedelta(days=i) for i in range(file_count)]
+        datetime_list = [end_datetime - timedelta(days=i) for i in range(file_count + 1)]
         file_path_list = [
             os.path.join(self.base_file_path, f'{cur_datetime.year}-{cur_datetime.month}', f'{cur_datetime.day}.csv')
             for cur_datetime in datetime_list]
