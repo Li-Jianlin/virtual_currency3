@@ -56,7 +56,7 @@ class DataProcess:
             self.combined_data = self.previous_all_data
 
         self.combined_data.drop_duplicates(inplace=True)
-        self.combined_data = self.combined_data[self.combined_data['coin_name'].isin(self.data['coin_name'])]
+        self.combined_data = self.combined_data.merge(self.data, on=['coin_name', 'spider_web'], how='right')
         return self
 
     def fill_na(self):
@@ -73,18 +73,13 @@ class DataProcess:
         data_for_calculate_columns = self.combined_data.copy().sort_values('time', ascending=True)
         # 设置 data 的索引
         data = self.data.copy().set_index(['coin_name', 'spider_web'])
-        # data_for_calculate_columns = data_for_calculate_columns.set_index(['coin_name', 'spider_web'])
-        # 设置 data 的索引
-        data = self.data.copy().set_index(['coin_name', 'spider_web'])
 
         data['high'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('max')
 
         # 同理可得低价、开盘价和收盘价
         data['low'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('min')
         data['open'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('first')
-
-        # 将 'close' 列直接从 `self.data` 获取并赋值
-        data['close'] = data['coin_price']
+        data['close'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('last')
         self.data = data.reset_index()
         del data
         return self
@@ -133,7 +128,10 @@ class DataProcess:
     def calculate_all(self):
         if self.unit_time == 'hour':
             self.fill_na()
-        self.get_price_columns().calculate_change_rate().calculate_amplitude().calculate_virtual_drop().update_statistics_table()
+        try:
+            self.get_price_columns().calculate_change_rate().calculate_amplitude().calculate_virtual_drop().update_statistics_table()
+        except Exception as e:
+            logger.warning(e)
 
 
 if __name__ == '__main__':
@@ -147,7 +145,7 @@ if __name__ == '__main__':
         # })
         data = pd.read_csv('../data_00.csv', encoding='utf-8', dtype={'coin_price': str})
         data['coin_price'] = data['coin_price'].apply(Decimal)
-        da = DataProcess(data, 'China', unit_time='day', time='2024-11-05 00:00:00',
+        da = DataProcess(data, 'Foreign', unit_time='day', time='2024-11-05 00:00:00'
                          )
         da.get_needed_data()
         da.calculate_all()
