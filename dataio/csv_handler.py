@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 
-from requests.packages import target
+from dateutil.relativedelta import relativedelta
 
 from msg_log.mylog import get_logger
 import math
@@ -121,6 +121,38 @@ class CSVReader:
                 combined_data = pd.concat([combined_data, target_data], axis=0, ignore_index=True)
         if not combined_data.empty:
             combined_data = combined_data[combined_data['time'].between(start_time, end_time, inclusive=inclusive)]
+        return combined_data
+
+
+    def get_data_between_days(self, start_time: str, end_time: str, inclusive: Literal["both", "neither", "left", "right"] = "both" ):
+        """根据起始和终止时间读取数据
+        :param start_time:
+        :param end_time:
+        :param inclusive: both:[], left:[), right: (], neither: ()
+        """
+        start_datetime = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
+        end_datetime = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
+        months_diff = (end_datetime.year - start_datetime.year) * 12 + end_datetime.month - start_datetime.month
+
+        if end_datetime.day - start_datetime.day > 0:
+            months_diff += 1
+
+        file_count = months_diff
+
+        datetime_list = [end_datetime - relativedelta(months=i) for i in range(file_count)]
+
+        file_path_list = [os.path.join(self.base_file_path, f'{cur_datetime.year}-{cur_datetime.month}', 'all_midnight.csv') for cur_datetime in datetime_list]
+        combined_data = pd.DataFrame()
+        for file_path in file_path_list:
+            try:
+                target_data = pd.read_csv(file_path, low_memory=False, encoding='utf-8', dtype='str')
+            except FileNotFoundError:
+                continue
+            else:
+                combined_data = pd.concat([combined_data, target_data], ignore_index=True)
+
+        combined_data = combined_data[combined_data['time'].between(start_time, end_time, inclusive=inclusive)]
+        combined_data = self.change_data_type(combined_data, only_price=False)
         return combined_data
 
     def get_statistical_table(self, unit_time: Literal['hour', 'day']):

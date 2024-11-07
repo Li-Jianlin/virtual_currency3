@@ -29,7 +29,9 @@ class ProgramCotroller:
         logger.info('初始化读写器')
         self.reader = CSVReader(data_region=data_region, base_file_path=self.base_file_path.get(data_region))
         self.writer = CSVWriter(data_region=data_region, base_file_path=self.base_file_path.get(data_region))
-        self.cur_time = datetime.now().replace(second=0).strftime("%Y-%m-%d %H:%M:%S")
+        self.cur_datetime = datetime.now().replace(second=0)
+        self.cur_time = self.cur_datetime.strftime("%Y-%m-%d %H:%M:%S")
+
         # 爬虫
         logger.info('初始化数据爬取器')
         self.binance_data_getter = DataGetter(SpiderWeb.BINANCE)
@@ -133,11 +135,13 @@ while True:
                                                                unit_time='hour')
             logger.info('开始计算')
             calculated_data = controller.calculate_data()
+            pre_time = (controller.cur_datetime - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+            calculated_data['time'] = pre_time
             logger.info('计算完成，写入数据')
             controller.writer.write_data(calculated_data, unit_time='hour')
             logger.info('写入完成，生成国际数据')
             foreign_calculated_data = calculated_data.copy()
-            foreign_calculated_data['time'] = controller.foreign_time
+            foreign_calculated_data['time'] = (controller.foreign_datetime - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
             controller.change_data_region('Foreign')
             controller.writer.write_data(foreign_calculated_data, unit_time='hour')
             logger.info('国际数据写入完成')
@@ -151,6 +155,7 @@ while True:
                                                                unit_time='day')
             logger.info('开始计算')
             calculated_data_day = controller.calculate_data()
+            calculated_data_day['time'] = (controller.cur_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
             logger.info('计算完成，写入数据')
             controller.writer.write_data(calculated_data_day, unit_time='day')
             logger.info('写入完成')
@@ -160,8 +165,9 @@ while True:
             logger.info('计算国际0点数据')
             controller.change_data_region('Foreign')
             controller.change_data_processer(data=foreign_data.copy(), time=controller.foreign_time,
-                                                               unit_time='day')
+                                                               unit_time='day', data_region='Foreign')
             calculated_data_foreign_day = controller.calculate_data()
+            calculated_data_foreign_day['time'] = (controller.foreign_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
             logger.info('计算完成，写入数据')
             controller.writer.write_data(calculated_data_foreign_day, unit_time='day')
 

@@ -31,6 +31,7 @@ class DataProcess:
         self.csv_writer = kwargs.get('writer', CSVWriter(data_region, base_file_path=kwargs.get('base_file_path',
                                                                                                 default_base_file_path)))
         self.datetime = datetime.now().replace(second=0)
+
         self.time = kwargs.get('time', self.datetime.strftime('%Y-%m-%d %H:%M:%S'))
         self.unit_time = unit_time
 
@@ -56,7 +57,7 @@ class DataProcess:
             self.combined_data = self.previous_all_data
 
         self.combined_data.drop_duplicates(inplace=True)
-        self.combined_data = self.combined_data.merge(self.data, on=['coin_name', 'spider_web'], how='right')
+        self.combined_data = self.combined_data.merge(self.data[['coin_name', 'spider_web']], on=['coin_name', 'spider_web'], how='right')
         return self
 
     def fill_na(self):
@@ -75,11 +76,10 @@ class DataProcess:
         data = self.data.copy().set_index(['coin_name', 'spider_web'])
 
         data['high'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('max')
-
-        # 同理可得低价、开盘价和收盘价
         data['low'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('min')
         data['open'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('first')
         data['close'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('last')
+
         self.data = data.reset_index()
         del data
         return self
