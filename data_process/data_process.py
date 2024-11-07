@@ -30,8 +30,8 @@ class DataProcess:
                                                                                                 default_base_file_path)))
         self.csv_writer = kwargs.get('writer', CSVWriter(data_region, base_file_path=kwargs.get('base_file_path',
                                                                                                 default_base_file_path)))
-
-        self.time = kwargs.get('time', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        self.datetime = datetime.now().replace(second=0)
+        self.time = kwargs.get('time', self.datetime.strftime('%Y-%m-%d %H:%M:%S'))
         self.unit_time = unit_time
 
     def get_needed_data(self):
@@ -107,10 +107,15 @@ class DataProcess:
 
     def update_statistics_table(self):
         """更新统计表信息"""
+        pre_time = None
+        if self.unit_time == 'hour':
+            pre_time = (self.datetime - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+        elif self.unit_time == 'day':
+            pre_time = (self.datetime - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
         to_be_merged_data = self.data[['high', 'low', 'coin_name', 'spider_web']]
-        to_be_merged_data = to_be_merged_data.rename(columns={'high': f"{self.time}_high", 'low': f"{self.time}_low"})
+        to_be_merged_data = to_be_merged_data.rename(columns={'high': f"{pre_time}_high", 'low': f"{pre_time}_low"})
         if not self.statistics_table.empty:
-            # 删除第一列
+            # 排序
             self.statistics_table = self.statistics_table.reindex(columns=['coin_name', 'spider_web'] + sorted(
                 self.statistics_table.columns.difference(['coin_name', 'spider_web'])))
 
