@@ -268,8 +268,8 @@ while True:
         controller.change_data_region('Foreign')
         controller.writer.is_check = False
         controller.writer.write_detail_data(foreign_data)
-
         logger.info('详情数据写入完成,执行每分钟函数')
+        controller.change_data_region('China')
         res_minute = controller.execute_minute_function(combined_data)
         if res_minute:
             send_email(subject='分钟函数结果', content=res_minute, test=True)
