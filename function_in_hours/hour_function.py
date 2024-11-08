@@ -469,21 +469,21 @@ class DayFunctionHandler(FunctionHandler):
         else:
             logger.info('日函数1无异常')
 
+if __name__ == "__main__":
+    csv_reader = CSVReader(data_region='China')
 
-csv_reader = CSVReader(data_region='China')
+    data = pd.read_csv(r"D:\PythonCode\virtual_currency-3.0\test.csv")
+    data = csv_reader.change_data_type(data, only_price=False)
 
-data = pd.read_csv(r"D:\PythonCode\virtual_currency-3.0\test.csv")
-data = csv_reader.change_data_type(data, only_price=False)
+    # hourly_function_hander = HourlyFunctionHandler(reader=csv_reader, time='2024-11-06 10:00:00', data=data)
 
-# hourly_function_hander = HourlyFunctionHandler(reader=csv_reader, time='2024-11-06 10:00:00', data=data)
+    # hourly_function_hander.get_range_data_hours("2024-11-05 10:00:00", "2024-11-06 10:00:00", inclusive='left')
+    # hourly_function_hander.change_and_virtual_drop_and_price_func_1()
 
-# hourly_function_hander.get_range_data_hours("2024-11-05 10:00:00", "2024-11-06 10:00:00", inclusive='left')
-# hourly_function_hander.change_and_virtual_drop_and_price_func_1()
+    # minute_function_handler = MinuteFunctionHandler(reader=csv_reader, time='2024-11-06 10:00:00', data=data)
+    # minute_function_handler.get_range_data_hours("2024-11-05 10:00:00", "2024-11-06 10:00:00", inclusive='left')
+    # minute_function_handler.change_and_virtual_drop_and_price_func_1_minute()
 
-# minute_function_handler = MinuteFunctionHandler(reader=csv_reader, time='2024-11-06 10:00:00', data=data)
-# minute_function_handler.get_range_data_hours("2024-11-05 10:00:00", "2024-11-06 10:00:00", inclusive='left')
-# minute_function_handler.change_and_virtual_drop_and_price_func_1_minute()
-
-dayfunctionhandler = DayFunctionHandler(reader=csv_reader, time='2024-11-06 10:00:00', data=data)
-dayfunctionhandler.get_range_data_days("2024-11-05 00:00:00", "2024-11-06 00:00:00", inclusive='left')
-dayfunctionhandler.continous_change_drop_func_1()
+    dayfunctionhandler = DayFunctionHandler(reader=csv_reader, time='2024-11-06 10:00:00', data=data)
+    dayfunctionhandler.get_range_data_days("2024-11-05 00:00:00", "2024-11-06 00:00:00", inclusive='left')
+    dayfunctionhandler.continous_change_drop_func_1()
