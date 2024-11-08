@@ -206,8 +206,7 @@ class HourlyFunctionHandler(FunctionHandler):
 
         merged_ABC_data = virtual_drop_and_change_data_A_to_B.merge(
             change_data_at_C[['coin_name', 'spider_web', 'close']],
-            on=['coin_name', 'spider_web'], how='right', suffixes=('', '_C'))
-        merged_ABC_data.dropna(inplace=True)
+            on=['coin_name', 'spider_web'], how='right', suffixes=('', '_C')).dropna()
 
         condition_C_close_less_AB_min = (merged_ABC_data['close_C'] <= merged_ABC_data['low'])
         conform_C_close_AB_min = merged_ABC_data[condition_C_close_less_AB_min]
@@ -339,10 +338,11 @@ class MinuteFunctionHandler(FunctionHandler):
         change_and_virtual_drop_data_A_to_B = self.filter_by_virtual_drop(change_A_to_B_data, 'ge',
                                                                           AB_VIRTUAL_DROP).copy()
 
+
         # AB收盘价与C价格对比
         merged_ABC_data = change_and_virtual_drop_data_A_to_B.merge(C_data[['coin_name', 'spider_web', 'coin_price']],
                                                                     on=['coin_name', 'spider_web'], how='right',
-                                                                    suffixes=('', '_C')).dropna(inplace=True)
+                                                                    suffixes=('', '_C')).dropna()
 
         AB_low_gt_C_price_condition = (merged_ABC_data['low'] > merged_ABC_data['coin_price_C'])
 
