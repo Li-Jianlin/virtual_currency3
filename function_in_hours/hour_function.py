@@ -152,9 +152,10 @@ class FunctionHandler:
     def execute_all(self):
         # 执行所有函数
         for func in self.functions:
-            res = func()
-            if res:
-                self.results.append(res)
+            if not self.range_data.empty:
+                res = func()
+                if res:
+                    self.results.append(res)
 
 
 class HourlyFunctionHandler(FunctionHandler):

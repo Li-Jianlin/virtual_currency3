@@ -37,7 +37,7 @@ class ProgramCotroller:
         # 爬虫
         logger.info('初始化数据爬取器')
         self.binance_data_getter = DataGetter(SpiderWeb.BINANCE)
-        self.inversting_data_getter = DataGetter(SpiderWeb.COIN_STATS)
+        self.inversting_data_getter = DataGetter(SpiderWeb.INVERSTING)
         self.lock = Lock()
         logger.info('初始化数据处理器')
         self.data_processer = DataProcess(data=pd.DataFrame(), data_region=data_region, unit_time='hour',
@@ -79,7 +79,7 @@ class ProgramCotroller:
     def get_data_by_multithreading(self):
         self.threads = []
         self.res = []
-        name = ['coin-stats', 'binance']
+        name = ['inversting', 'binance']
         for cur_getter in (self.inversting_data_getter, self.binance_data_getter):
             thread = Thread(target=self.get_data, args=(cur_getter,), daemon=True)
             self.threads.append(thread)
@@ -219,6 +219,7 @@ while True:
         pre_24_hours_strtime = (controller.pre_hour_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
         minutefunctionhandler.get_range_data_hours(pre_24_hours_strtime, controller.cur_time, inclusive='left')
         minutefunctionhandler.data = combined_data
+
         minutefunctionhandler.execute_all()
         res_minute = '\n'.join(minutefunctionhandler.results)
         if res_minute:
