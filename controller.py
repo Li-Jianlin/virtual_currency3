@@ -223,3 +223,4 @@ while True:
         res_minute = '\n'.join(minutefunctionhandler.results)
         if res_minute:
             send_email(subject='分钟函数结果', content=res_minute, test=True)
+        logger.info('执行完毕')

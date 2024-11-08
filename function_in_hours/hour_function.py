@@ -374,9 +374,9 @@ class MinuteFunctionHandler(FunctionHandler):
         cur_res_list = []
         if not filter_data.empty:
             filter_data.sort_values(['coin_name', 'spider_web'], ascending=[True, True], inplace=True)
-            func_desc = f"[分钟函数1]{len(filter_data['coin_name'])}只股票异常有ABC三个时刻。其中C为当前时刻。"
+            func_desc = (f"[分钟函数1]{len(filter_data['coin_name'])}只股票异常有ABC三个时刻。其中C为当前时刻。"
             f"A时刻与C时刻不超过24小时。A时刻在B时刻之前，A和B时刻均要满足虚降>={AB_VIRTUAL_DROP}%且跌涨幅<={AB_CHANGE}%，A时刻收盘价大于B时刻收盘价。"
-            "C时刻价格同时小于A和B的最低价，后面两次异常价格低于第一次异常时价格。"
+            "C时刻价格同时小于A和B的最低价，后面两次异常价格低于第一次异常时价格。")
             cur_res_list.append(func_desc)
             cur_res_list.append(filter_data.to_string(index=False))
             cur_res_str = '\n'.join(cur_res_list)
