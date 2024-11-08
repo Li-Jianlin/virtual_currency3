@@ -14,7 +14,7 @@ from data_process.data_process import DataProcess
 from config import SpiderWeb
 from msg_log.mylog import get_logger
 from function_in_hours.hour_function import HourlyFunctionHandler, DayFunctionHandler, MinuteFunctionHandler
-
+from msg_log.msg_send import send_email
 PROJECT_ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', 'controll.log'))
 
@@ -109,6 +109,48 @@ class ProgramCotroller:
         self.pre_hour_datetime = cur_datetime - timedelta(hours=1)
         self.pre_hour_strtime = self.pre_hour_datetime.strftime("%Y-%m-%d %H:%M:%S")
 
+    def hours_data_process(self, combined_data):
+        logger.info('计算国内整点数据')
+        self.change_data_region('China')
+        self.change_data_processer(data=combined_data, time=self.cur_time,
+                                         cur_datetime=self.cur_datetime,
+                                         unit_time='hour')
+        logger.info('开始计算')
+        calculated_data = self.calculate_data()
+        pre_time = (self.cur_datetime - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+        calculated_data['time'] = pre_time
+        logger.info('计算完成，写入数据')
+        self.writer.write_data(calculated_data, unit_time='hour')
+        logger.info('写入完成，生成国际数据')
+        foreign_calculated_data = calculated_data.copy()
+        foreign_calculated_data['time'] = (self.foreign_datetime - timedelta(hours=1)).strftime(
+            "%Y-%m-%d %H:%M:%S")
+        self.change_data_region('Foreign')
+        self.writer.write_data(foreign_calculated_data, unit_time='hour')
+        logger.info('国际数据写入完成')
+        return calculated_data
+
+    def days_data_process(self, combined_data, data_region='China'):
+        if data_region == 'China':
+            logger.info('计算国内0点数据')
+            time = self.cur_time
+            cur_datetime = self.cur_datetime
+        else:
+            logger.info('计算国际0点数据')
+            time = self.foreign_time
+            cur_datetime = self.foreign_datetime
+        self.change_data_region(data_region=data_region)
+        self.change_data_processer(data=combined_data, time=time,
+                                         cur_datetime=cur_datetime,
+                                         unit_time='day')
+        logger.info('开始计算')
+        calculated_data_day = self.calculate_data()
+        calculated_data_day['time'] = (cur_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+        logger.info('计算完成，写入数据')
+        self.writer.write_data(calculated_data_day, unit_time='day')
+        logger.info('写入完成')
+        return calculated_data_day
+
 
 logger.info('启动程序')
 
@@ -119,11 +161,13 @@ dayfunctionhandler = DayFunctionHandler(data=None, reader=controller.reader, wri
                                         time=controller.cur_time)
 minutefunctionhandler = MinuteFunctionHandler(data=None, reader=controller.reader, writer=controller.writer,
                                               time=controller.cur_time)
-hourfunctionhandler.add_function(hourfunctionhandler.change_and_virtual_drop_and_price_func_1)
 
+hourfunctionhandler.add_function(hourfunctionhandler.change_and_virtual_drop_and_price_func_1)
+minutefunctionhandler.add_function(minutefunctionhandler.change_and_virtual_drop_and_price_func_1_minute)
 while True:
     cur_datetime = datetime.now()
     if cur_datetime.second == 0:
+        # 更新时间
         controller.get_time(cur_datetime)
         logger.info('爬取数据')
 
@@ -139,64 +183,30 @@ while True:
 
         logger.info('为数据增加time列')
         combined_data = controller.add_time_column(controller.cur_time, combined_data)
-
+        combined_data = controller.reader.change_data_type(combined_data, only_price=True)
         foreign_data = combined_data.copy()
         foreign_data['time'] = controller.foreign_time
 
         # 国内整点(每小时)
         if controller.cur_minute == 0:
-            logger.info('计算国内整点数据')
-            controller.change_data_region('China')
-            controller.change_data_processer(data=combined_data.copy(), time=controller.cur_time,
-                                             cur_datetime=controller.cur_datetime,
-                                             unit_time='hour')
-            logger.info('开始计算')
-            calculated_data = controller.calculate_data()
-            pre_time = (controller.cur_datetime - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
-            calculated_data['time'] = pre_time
-            logger.info('计算完成，写入数据')
-            controller.writer.write_data(calculated_data, unit_time='hour')
-            logger.info('写入完成，生成国际数据')
-            foreign_calculated_data = calculated_data.copy()
-            foreign_calculated_data['time'] = (controller.foreign_datetime - timedelta(hours=1)).strftime(
-                "%Y-%m-%d %H:%M:%S")
-            controller.change_data_region('Foreign')
-            controller.writer.write_data(foreign_calculated_data, unit_time='hour')
-            logger.info('国际数据写入完成')
+            calculated_data = controller.hours_data_process(combined_data=combined_data.copy())
 
             # 小时函数
             hourfunctionhandler.data = calculated_data
             pre_24_hours_strtime = (controller.pre_hour_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
             hourfunctionhandler.get_range_data_hours(pre_24_hours_strtime, controller.cur_time, inclusive='left')
             hourfunctionhandler.execute_all()
+            res_hour = '\n'.join(hourfunctionhandler.results)
+            if res_hour:
+                send_email(subject='每小时函数结果', content=res_hour, test=True)
 
         # 国内0点
         if cur_datetime.hour == 0 and controller.cur_minute == 0:
-            logger.info('计算国内0点数据')
-            controller.change_data_region('China')
-            controller.change_data_processer(data=combined_data.copy(), time=controller.cur_time,
-                                             cur_datetime=controller.cur_datetime,
-                                             unit_time='day')
-            logger.info('开始计算')
-            calculated_data_day = controller.calculate_data()
-            calculated_data_day['time'] = (controller.cur_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
-            logger.info('计算完成，写入数据')
-            controller.writer.write_data(calculated_data_day, unit_time='day')
-            logger.info('写入完成')
+            controller.days_data_process(combined_data.copy(), data_region='China')
 
         # 国际0点（国内8点）
         if cur_datetime.hour == 8 and controller.cur_minute == 0:
-            logger.info('计算国际0点数据')
-            controller.change_data_region('Foreign')
-            controller.change_data_processer(data=foreign_data.copy(), time=controller.foreign_time,
-                                             cur_datetime=controller.foreign_datetime,
-                                             unit_time='day',
-                                             data_region='Foreign')
-            calculated_data_foreign_day = controller.calculate_data()
-            calculated_data_foreign_day['time'] = (controller.foreign_datetime - timedelta(days=1)).strftime(
-                "%Y-%m-%d %H:%M:%S")
-            logger.info('计算完成，写入数据')
-            controller.writer.write_data(calculated_data_foreign_day, unit_time='day')
+            calculated_data_day = controller.days_data_process(foreign_data.copy(), data_region='Foreign')
 
         # 不是整点
         logger.info('写入详情数据')
@@ -205,4 +215,11 @@ while True:
         controller.change_data_region('Foreign')
         controller.writer.is_check = False
         controller.writer.write_detail_data(foreign_data)
-        logger.info('详情数据写入完成')
+        logger.info('详情数据写入完成,执行每分钟函数')
+        pre_24_hours_strtime = (controller.pre_hour_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+        minutefunctionhandler.get_range_data_hours(pre_24_hours_strtime, controller.cur_time, inclusive='left')
+        minutefunctionhandler.data = combined_data
+        minutefunctionhandler.execute_all()
+        res_minute = '\n'.join(minutefunctionhandler.results)
+        if res_minute:
+            send_email(subject='分钟函数结果', content=res_minute, test=True)
