@@ -50,8 +50,8 @@ class ProgramCotroller:
         self.reader.base_file_path = self.base_file_path.get(data_region)
         self.writer.base_file_path = self.base_file_path.get(data_region)
 
-    def change_data_processer(self, data: pd.DataFrame, time: str, unit_time='hour', data_region='China',
-                              cur_datetime: datetime):
+    def change_data_processer(self, data: pd.DataFrame, time: str, cur_datetime: datetime, unit_time='hour',
+                              data_region='China'):
         """修改数据计算对象的相关属性"""
 
         self.data_processer.data = data
