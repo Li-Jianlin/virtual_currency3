@@ -215,7 +215,7 @@ controller = ProgramCotroller('China')
 controller.create_function_handler()
 
 while True:
-    cur_datetime = datetime.now()
+    cur_datetime = datetime.now().replace(microsecond=0)
     if cur_datetime.second == 0:
         # 更新时间
         controller.update_time(cur_datetime)
