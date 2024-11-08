@@ -39,7 +39,7 @@ CONFIG_JSON_SELENIUM = {
         'coin_name_css': '.table_box > .title',
         'coin_price_xpath': '//tbody/tr/td[4]'
     },
-    'coin_glass': {
+    'coin_lass': {
         'url': 'https://www.coinglass.com/zh/exchanges/Binance',
         'method': 'click',
         'more_msg_button_css': 'button.MuiButton-root.MuiButton-variantSoft.MuiButton-colorNeutral.MuiButton-sizeMd.cg-style-sbekbk',

@@ -35,9 +35,8 @@ class SpiderBySelenium(Spider):
         self.options = Options()
         self.options.add_argument('--headless')
         self.options.add_argument("--disable-gpu")  # 禁用GPU加速
-        self.options.add_argument('--no-sandbox')
-        self.options.add_argument('--disable-extensions') # 禁用拓展
-        self.options.add_argument('--disable-images')
+        # self.options.add_argument('--disable-extensions') # 禁用拓展
+        # self.options.add_argument('--disable-images')
         self.options.page_load_strategy = 'none' # 不等待页面加载完成
         # 关闭浏览器上部提示语：Chrome正在受到自动软件的控制
         self.options.add_experimental_option('excludeSwitches', ['enable-automation'])
@@ -47,17 +46,19 @@ class SpiderBySelenium(Spider):
         self.options.add_argument('--hide-scrollbars')  # 隐藏滚动条, 应对一些特殊页面
         self.options.add_argument(
             f'user-agent={self.headers["User-Agent"]}')
+        self.options.add_argument('--no-sandbox')
+
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.options)
         self.wait = WebDriverWait(self.driver, 30)
         self.driver.get(self.url)
-        time.sleep(3)
+        time.sleep(10)
 
     def get_driver(self):
         """使用有头浏览器"""
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
         self.wait = WebDriverWait(self.driver, 10)
         self.driver.get(self.url)
-        time.sleep(3)
+        time.sleep(5)
 
     def load_page(self):
         """根据配置文件中的加载方法将要爬取的页面全部加载出来。slide为滑动加载页面，click为点击按钮加载页面"""

@@ -30,7 +30,7 @@ class DataProcess:
                                                                                                 default_base_file_path)))
         self.csv_writer = kwargs.get('writer', CSVWriter(data_region, base_file_path=kwargs.get('base_file_path',
                                                                                                 default_base_file_path)))
-        self.datetime = datetime.now().replace(second=0)
+        self.datetime = kwargs.get('datetime' ,datetime.now().replace(second=0))
 
         self.time = kwargs.get('time', self.datetime.strftime('%Y-%m-%d %H:%M:%S'))
         self.unit_time = unit_time
@@ -39,7 +39,7 @@ class DataProcess:
         """获取后续处理需要的数据"""
         self.data['coin_price'] = self.data['coin_price'].apply(Decimal)
         self.data = self.data[self.data['coin_price'] != 0]
-        self.detail_data = self.csv_reader.get_detail_data(self.time)
+        self.detail_data = self.csv_reader.get_detail_data()
         self.statistics_table = self.csv_reader.get_statistical_table(self.unit_time)
 
         if self.detail_data.empty:
@@ -49,7 +49,7 @@ class DataProcess:
         if self.unit_time == 'hour':
             self.combined_data = pd.concat([self.data, self.detail_data], ignore_index=True)
         else:
-            self.previous_all_data = self.csv_reader.get_previous_all_data(self.time, 'hour')
+            self.previous_all_data = self.csv_reader.get_previous_all_data(self.datetime, 'hour')
             if self.previous_all_data.empty:
                 logger.warning(f'{self.time}之前没有数据')
                 # 没有小时数据

@@ -51,9 +51,9 @@ class CSVReader:
 
         return data
 
-    def get_fillna_data(self, filled_date: str):
+    def get_fillna_data(self, filled_date: datetime):
         """读取用于填充指定网站缺失值的数据"""
-        filled_date = (datetime.strptime(filled_date, '%Y-%m-%d %H:%M:%S')) - timedelta(hours=1)
+        filled_date = filled_date - timedelta(hours=1)
         filled_data_path = os.path.join(self.base_file_path, f"{filled_date.year}-{filled_date.month}",
                                         f"{filled_date.day}.csv")
         try:
@@ -63,13 +63,13 @@ class CSVReader:
             target_web_data = pd.DataFrame()
         return target_web_data
 
-    def get_previous_all_data(self, cur_date: str, unit_time: Literal['hour', 'day']):
+    def get_previous_all_data(self, cur_datetime: datetime, unit_time: Literal['hour', 'day']):
         """读取出前一个单位时间数据所在的文件中所有数据"""
         if unit_time == 'hour':
-            previous_datetime = (datetime.strptime(cur_date, '%Y-%m-%d %H:%M:%S')) - timedelta(hours=1)
+            previous_datetime = cur_datetime - timedelta(hours=1)
             target_file_name = f'{previous_datetime.day}.csv'
         elif unit_time == 'day':
-            previous_datetime = (datetime.strptime(cur_date, '%Y-%m-%d %H:%M:%S')) - timedelta(days=1)
+            previous_datetime = cur_datetime - timedelta(days=1)
             target_file_name = f'all_midnight.csv'
         else:
             raise KeyError('unit_time参数只能是hour或day')
@@ -78,30 +78,30 @@ class CSVReader:
         try:
             target_data = pd.read_csv(target_file_path, low_memory=False, encoding='utf-8', dtype='str')
             target_data = self.change_data_type(target_data, only_price=False)
+            target_data['time'] = pd.to_datetime(target_data['time'])
         except FileNotFoundError:
             logger.warning(f'{target_file_path}文件不存在')
             target_data = pd.DataFrame()
         return target_data
 
-    def get_detail_data(self, cur_date: str):
+    def get_detail_data(self):
         """获取前一个小时的所有详细数据"""
         detail_data_path = os.path.join(self.base_file_path, 'detail_data.csv')
         try:
             detail_data = pd.read_csv(detail_data_path, low_memory=False, encoding='utf-8', dtype='str')
             detail_data = self.change_data_type(detail_data, only_price=True)
+            detail_data['time'] = pd.to_datetime(detail_data['time'])
         except FileNotFoundError:
             logger.warning(f'{detail_data_path}文件不存在')
             detail_data = pd.DataFrame()
         return detail_data
 
-    def get_data_between_hours(self, start_time: str, end_time: str, inclusive: Literal["both", "neither", "left", "right"] = "both" ):
+    def get_data_between_hours(self, start_datetime: datetime, end_datetime: datetime, inclusive: Literal["both", "neither", "left", "right"] = "both" ):
         """根据起始和终止时间读取数据
-        :param start_time:
-        :param end_time:
+        :param end_datetime:
+        :param start_datetime:
         :param inclusive: 决定选择文件的边界。both:[], left:[), right: (], neither: ()
         """
-        start_datetime = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
-        end_datetime = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
         delta_time = math.ceil((end_datetime - start_datetime).total_seconds() / 3600)
         file_count = math.floor(delta_time / 24)
         datetime_list = [end_datetime - timedelta(days=i) for i in range(file_count + 1)]
@@ -120,18 +120,17 @@ class CSVReader:
             else:
                 combined_data = pd.concat([combined_data, target_data], axis=0, ignore_index=True)
         if not combined_data.empty:
-            combined_data = combined_data[combined_data['time'].between(start_time, end_time, inclusive=inclusive)]
+            combined_data['time'] = pd.to_datetime(combined_data['time'])
+            combined_data = combined_data[combined_data['time'].between(start_datetime, end_datetime, inclusive=inclusive)]
         return combined_data
 
 
-    def get_data_between_days(self, start_time: str, end_time: str, inclusive: Literal["both", "neither", "left", "right"] = "both" ):
+    def get_data_between_days(self, start_datetime: datetime, end_datetime: datetime, inclusive: Literal["both", "neither", "left", "right"] = "both" ):
         """根据起始和终止时间读取数据
-        :param start_time:
-        :param end_time:
+        :param start_datetime:
+        :param end_datetime:
         :param inclusive: both:[], left:[), right: (], neither: ()
         """
-        start_datetime = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
-        end_datetime = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
         months_diff = (end_datetime.year - start_datetime.year) * 12 + end_datetime.month - start_datetime.month
 
         if end_datetime.day - start_datetime.day > 0:
@@ -150,9 +149,10 @@ class CSVReader:
                 continue
             else:
                 combined_data = pd.concat([combined_data, target_data], ignore_index=True)
-
-        combined_data = combined_data[combined_data['time'].between(start_time, end_time, inclusive=inclusive)]
-        combined_data = self.change_data_type(combined_data, only_price=False)
+        if not combined_data.empty:
+            combined_data['time'] = pd.to_datetime(combined_data['time'])
+            combined_data = combined_data[combined_data['time'].between(start_datetime, end_datetime, inclusive=inclusive)]
+            combined_data = self.change_data_type(combined_data, only_price=False)
         return combined_data
 
     def get_statistical_table(self, unit_time: Literal['hour', 'day']):
@@ -180,8 +180,8 @@ class CSVWriter:
 
     def write_data(self, data: pd.DataFrame, unit_time: Literal['hour', 'day']):
         """写入数据"""
-        cur_time = data.iloc[0]['time']
-        cur_timedate = datetime.strptime(cur_time, '%Y-%m-%d %H:%M:%S')
+        data['time'] = pd.to_datetime(data['time'])
+        cur_timedate = data.iloc[0]['time']
         target_file_folder = os.path.join(self.base_file_path, f'{cur_timedate.year}-{cur_timedate.month}')
         make_sure_path_exists(target_file_folder)
         if unit_time == 'hour':
@@ -198,8 +198,8 @@ class CSVWriter:
 
     def write_detail_data(self, data: pd.DataFrame):
         """将当前爬取的详细数据写入到detail_data文件中"""
-        cur_time = data.iloc[0]['time']
-        cur_datetime = datetime.strptime(cur_time, '%Y-%m-%d %H:%M:%S')
+        data['time'] = pd.to_datetime(data['time'])
+        cur_datetime = data.iloc[0]['time']
         target_file_folder = self.base_file_path
         make_sure_path_exists(target_file_folder)
         target_file_name = f'detail_data.csv'
@@ -209,9 +209,9 @@ class CSVWriter:
         if not self.is_check:
             if os.path.exists(target_file_path):
                 checked_data = pd.read_csv(target_file_path, low_memory=False, encoding='utf-8')
+                checked_data['time'] = pd.to_datetime(checked_data['time'])
                 # 不是当前时刻的数据则删除
-                file_time = checked_data.iloc[0]['time']
-                file_datetime = datetime.strptime(file_time, '%Y-%m-%d %H:%M:%S')
+                file_datetime = checked_data.iloc[0]['time']
                 if file_datetime.hour != cur_datetime.hour:
                     logger.info(f'{target_file_path}文件中存在非当前时刻数据，删除文件重新写入')
                     os.remove(target_file_path)

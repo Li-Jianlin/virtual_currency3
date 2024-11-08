@@ -27,9 +27,14 @@ class ProgramCotroller:
     }
 
     def __init__(self, data_region: Literal['China', 'Foreign'], **kwargs):
+        self.foreign_datetime = None
+        self.threads = None
+        self.foreign_time = None
+        self.cur_minute = None
         logger.info('初始化读写器')
         self.reader = CSVReader(data_region=data_region, base_file_path=self.base_file_path.get(data_region))
         self.writer = CSVWriter(data_region=data_region, base_file_path=self.base_file_path.get(data_region))
+
         self.cur_datetime = datetime.now().replace(second=0)
         self.cur_time = self.cur_datetime.strftime("%Y-%m-%d %H:%M:%S")
         self.pre_hour_datetime = self.cur_datetime - timedelta(hours=1)
@@ -37,12 +42,12 @@ class ProgramCotroller:
         # 爬虫
         logger.info('初始化数据爬取器')
         self.binance_data_getter = DataGetter(SpiderWeb.BINANCE)
-        self.inversting_data_getter = DataGetter(SpiderWeb.INVERSTING)
+        self.inversting_data_getter = DataGetter(SpiderWeb.COIN_STATS)
         self.lock = Lock()
         logger.info('初始化数据处理器')
         self.data_processer = DataProcess(data=pd.DataFrame(), data_region=data_region, unit_time='hour',
                                           writer=self.writer,
-                                          reader=self.reader, time=self.cur_time)
+                                          reader=self.reader, time=self.cur_time, datetime=self.cur_datetime)
         logger.info('初始化成功')
 
     def change_data_region(self, data_region: Literal['China', 'Foreign']):
@@ -60,10 +65,10 @@ class ProgramCotroller:
         self.data_processer.data_region = data_region
         self.data_processer.datetime = cur_datetime
 
-    def add_time_column(self, cur_time: str, data: pd.DataFrame):
+    def add_time_column(self, data: pd.DataFrame):
         """为当前数据加上时间列"""
         if not data.empty:
-            data['time'] = cur_time
+            data['time'] = self.cur_datetime
         return data
 
     def get_data(self, data_getter: DataGetter, **kwargs):
@@ -99,7 +104,7 @@ class ProgramCotroller:
         calculated_data = self.data_processer.data
         return calculated_data
 
-    def get_time(self, cur_datetime: datetime):
+    def update_time(self, cur_datetime: datetime):
         """得到当前时间"""
         self.cur_datetime = cur_datetime
         self.cur_minute = cur_datetime.minute
@@ -107,8 +112,7 @@ class ProgramCotroller:
         self.foreign_datetime = cur_datetime - timedelta(hours=8)
         self.foreign_time = self.foreign_datetime.strftime("%Y-%m-%d %H:%M:%S")
         self.pre_hour_datetime = cur_datetime - timedelta(hours=1)
-        self.pre_hour_strtime = self.pre_hour_datetime.strftime("%Y-%m-%d %H:%M:%S")
-
+        self.pre_day_datetime = cur_datetime - timedelta(days=1)
     def hours_data_process(self, combined_data):
         logger.info('计算国内整点数据')
         self.change_data_region('China')
@@ -151,24 +155,70 @@ class ProgramCotroller:
         logger.info('写入完成')
         return calculated_data_day
 
+    def create_function_handler(self):
+        """创建函数处理器"""
+        self.hourfunctionhandler = HourlyFunctionHandler(data=None, reader=self.reader, writer=self.writer,
+                                                         datetime=self.cur_datetime)
+        self.dayfunctionhandler = DayFunctionHandler(data=None, reader=self.reader, writer=self.writer,
+                                                     datetime=self.cur_datetime)
+        self.minutefunctionhandler = MinuteFunctionHandler(data=None, reader=self.reader, writer=self.writer,
+                                                           datetime=self.cur_datetime)
+
+    def add_funtion_to_handler(self, unit_time: Literal['hour', 'day', 'minute']):
+        if unit_time == 'hour':
+            self.hourfunctionhandler.add_function(self.hourfunctionhandler.change_and_virtual_drop_and_price_func_1)
+        # if unit_time == 'day':
+        #     self.dayfunctionhandler.add_function()
+
+        if unit_time == 'minute':
+            self.minutefunctionhandler.add_function(self.minutefunctionhandler.change_and_virtual_drop_and_price_func_1_minute)
+
+
+    # 执行小时函数
+    def execute_hour_function(self, cur_data):
+        # 更新数据以及相关信息
+        self.hourfunctionhandler.data = cur_data
+        # 时间
+        self.hourfunctionhandler.datetime = self.pre_hour_datetime
+        # 数据
+        pre_24_hours_datetime = self.cur_datetime - timedelta(hours=24)
+        self.hourfunctionhandler.get_range_data_hours(pre_24_hours_datetime, self.cur_datetime, inclusive='left')
+        self.hourfunctionhandler.execute_all()
+        if self.hourfunctionhandler.results:
+            res_str = '\n'.join(self.hourfunctionhandler.results)
+            return res_str
+
+    # 执行日函数
+    def execute_day_function(self, cur_data):
+        self.dayfunctionhandler.data = cur_data
+        self.dayfunctionhandler.datetime = self.pre_day_datetime
+        pre_four_days_datetime = self.cur_datetime - timedelta(days=4)
+        self.dayfunctionhandler.get_range_data_days(pre_four_days_datetime, self.pre_day_datetime, inclusive='left')
+        self.dayfunctionhandler.execute_all()
+        if self.dayfunctionhandler.results:
+            res_str = '\n'.join(self.dayfunctionhandler.results)
+            return res_str
+
+    def execute_minute_function(self, cur_data):
+        self.minutefunctionhandler.data = cur_data
+        self.minutefunctionhandler.datetime = self.cur_datetime
+        pre_24_hours_datetime = self.cur_datetime - timedelta(hours=24)
+        self.minutefunctionhandler.get_range_data_hours(pre_24_hours_datetime, self.cur_datetime, inclusive='left')
+        self.minutefunctionhandler.execute_all()
+        if self.minutefunctionhandler.results:
+            res_str = '\n'.join(self.minutefunctionhandler.results)
+            return res_str
 
 logger.info('启动程序')
 
 controller = ProgramCotroller('China')
-hourfunctionhandler = HourlyFunctionHandler(data=None, reader=controller.reader, writer=controller.writer,
-                                            time=controller.cur_time)
-dayfunctionhandler = DayFunctionHandler(data=None, reader=controller.reader, writer=controller.writer,
-                                        time=controller.cur_time)
-minutefunctionhandler = MinuteFunctionHandler(data=None, reader=controller.reader, writer=controller.writer,
-                                              time=controller.cur_time)
+controller.create_function_handler()
 
-hourfunctionhandler.add_function(hourfunctionhandler.change_and_virtual_drop_and_price_func_1)
-minutefunctionhandler.add_function(minutefunctionhandler.change_and_virtual_drop_and_price_func_1_minute)
 while True:
     cur_datetime = datetime.now()
     if cur_datetime.second == 0:
         # 更新时间
-        controller.get_time(cur_datetime)
+        controller.update_time(cur_datetime)
         logger.info('爬取数据')
 
         controller.get_data_by_multithreading()
@@ -182,31 +232,34 @@ while True:
             continue
 
         logger.info('为数据增加time列')
-        combined_data = controller.add_time_column(controller.cur_time, combined_data)
+        combined_data = controller.add_time_column(combined_data)
+        # 改变coin_price字段数据类型
         combined_data = controller.reader.change_data_type(combined_data, only_price=True)
+        # 生成国际数据
         foreign_data = combined_data.copy()
-        foreign_data['time'] = controller.foreign_time
+        foreign_data['time'] = controller.foreign_datetime
 
         # 国内整点(每小时)
         if controller.cur_minute == 0:
+            # 计算
             calculated_data = controller.hours_data_process(combined_data=combined_data.copy())
 
-            # 小时函数
-            hourfunctionhandler.data = calculated_data
-            pre_24_hours_strtime = (controller.pre_hour_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
-            hourfunctionhandler.get_range_data_hours(pre_24_hours_strtime, controller.cur_time, inclusive='left')
-            hourfunctionhandler.execute_all()
-            res_hour = '\n'.join(hourfunctionhandler.results)
+            res_hour = controller.execute_hour_function(calculated_data)
             if res_hour:
                 send_email(subject='每小时函数结果', content=res_hour, test=True)
 
         # 国内0点
         if cur_datetime.hour == 0 and controller.cur_minute == 0:
-            controller.days_data_process(combined_data.copy(), data_region='China')
-
+            calculated_data_day = controller.days_data_process(combined_data.copy(), data_region='China')
+            res_day = controller.execute_day_function(calculated_data_day)
+            if res_day:
+                send_email(subject='每天函数结果', content=res_day, test=True)
         # 国际0点（国内8点）
         if cur_datetime.hour == 8 and controller.cur_minute == 0:
-            calculated_data_day = controller.days_data_process(foreign_data.copy(), data_region='Foreign')
+            calculated_data_day_foreign = controller.days_data_process(foreign_data.copy(), data_region='Foreign')
+            res_day_foreign = controller.execute_day_function(calculated_data_day_foreign)
+            if res_day_foreign:
+                send_email(subject='国际每天函数结果', content=res_day_foreign, test=True)
 
         # 不是整点
         logger.info('写入详情数据')
@@ -215,13 +268,9 @@ while True:
         controller.change_data_region('Foreign')
         controller.writer.is_check = False
         controller.writer.write_detail_data(foreign_data)
-        logger.info('详情数据写入完成,执行每分钟函数')
-        pre_24_hours_strtime = (controller.pre_hour_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
-        minutefunctionhandler.get_range_data_hours(pre_24_hours_strtime, controller.cur_time, inclusive='left')
-        minutefunctionhandler.data = combined_data
 
-        minutefunctionhandler.execute_all()
-        res_minute = '\n'.join(minutefunctionhandler.results)
+        logger.info('详情数据写入完成,执行每分钟函数')
+        res_minute = controller.execute_minute_function(combined_data)
         if res_minute:
             send_email(subject='分钟函数结果', content=res_minute, test=True)
         logger.info('执行完毕')

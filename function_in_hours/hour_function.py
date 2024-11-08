@@ -26,8 +26,8 @@ def find_A_close_gt_B_close_included_C_close(group):
                 result.append({
                     'coin_name': coin_name,
                     'spider_web': spider_web,
-                    'time_A': group.iloc[i]['time'][8:],
-                    'time_B': group.iloc[j]['time'][8:],
+                    'time_A': group.iloc[i]['time'],
+                    'time_B': group.iloc[j]['time'],
                     'close_A': group.iloc[i]['close'],
                     'close_B': group.iloc[j]['close'],
                     'close_C': group.iloc[i]['close_C'],
@@ -68,19 +68,18 @@ class FunctionHandler:
         self.range_data = None
         self.functions = []
         self.results = []
-        self.datetime = datetime.now().replace(minute=0, second=0)
-        self.time = kwargs.get('time', self.datetime.strftime('%Y-%m-%d %H:%M:%S'))
+        self.datetime = kwargs.get('datetime', datetime.now().replace(second=0))
         self.data = kwargs.get('data', None)
         self.csv_reader = kwargs.get('reader', CSVReader("China"))
         self.csv_writer = kwargs.get('writer', CSVWriter("China"))
 
-    def get_range_data_hours(self, start_time: str, end_time: str,
+    def get_range_data_hours(self, start_datetime: datetime, end_datetime: datetime,
                              inclusive: Literal['both', 'neither', 'left', 'right'] = 'both'):
-        self.range_data = self.csv_reader.get_data_between_hours(start_time, end_time, inclusive)
+        self.range_data = self.csv_reader.get_data_between_hours(start_datetime, end_datetime, inclusive)
 
-    def get_range_data_days(self, start_time: str, end_time: str,
+    def get_range_data_days(self, start_datetime: datetime, end_datetime: datetime,
                             inclusive: Literal['both', 'neither', 'left', 'right'] = 'both'):
-        self.range_data_day = self.csv_reader.get_data_between_days(start_time, end_time, inclusive)
+        self.range_data_day = self.csv_reader.get_data_between_days(start_datetime, end_datetime, inclusive)
 
     @staticmethod
     def filter_by_amplitude(data: pd.DataFrame, comparison: Literal['gt', 'lt', 'ge', 'le', 'eq', 'neq'],
@@ -193,11 +192,9 @@ class HourlyFunctionHandler(FunctionHandler):
         change_data_at_C = self.filter_by_change_rate(data_at_C, 'lt', C_CHANGE)
 
         data_A_to_B = self.range_data
-        # self.datetime = datetime(2024,11,6, 10, 0, 0)
-
         datetime_A = self.datetime - timedelta(hours=MAX_TIME_INTERVAL)
-        timestr_A = datetime_A.strftime('%Y-%m-%d %H:%M:%S')
-        data_A_to_B = data_A_to_B[data_A_to_B['time'].between(timestr_A, self.time, inclusive='left')]
+
+        data_A_to_B = data_A_to_B[data_A_to_B['time'].between(datetime_A, self.datetime, inclusive='left')]
         data_A_to_B = data_A_to_B[data_A_to_B['coin_name'].isin(change_data_at_C['coin_name'])]
         data_A_to_B_sort_by_time_asc = data_A_to_B.sort_values('time', ascending=True)
 
@@ -276,23 +273,25 @@ class MinuteFunctionHandler(FunctionHandler):
         # merge时作为主键的列
         primary_key_columns = ['coin_name', 'spider_web'] + time_columns
 
+        to_be_filter_data['cnt'] = 1
         merged_data = record_data.merge(to_be_filter_data, on=primary_key_columns, how='outer',
                                         suffixes=('', '_filter'))
 
         if 'cnt' in diff_columns:
+            merged_data['cnt_filter'] = merged_data['cnt_filter'].fillna(0).infer_objects().astype(int)
             merged_data['cnt'] = merged_data['cnt'].fillna(0).infer_objects().astype(int)
-            has_new_data = merged_data['coin_price'].notna()
-            merged_data.loc[has_new_data, 'cnt'] += 1
+            merged_data['cnt'] = merged_data['cnt'] + merged_data['cnt_filter']
 
         if 'first_price' in diff_columns:
             merged_data['first_price'] = merged_data['first_price'].fillna(merged_data['coin_price'])
-
+            # 用无穷大填充
+            merged_data['coin_price'] = merged_data['coin_price'].fillna(Decimal('Infinity'))
         # 对时间列的名称进行升序排序，找出第一个时间列的名称
         first_time_col = sorted(time_columns)[0]
 
-        start_time = (self.datetime - timedelta(hours=MAX_TIME_INTERVAL)).strftime("%Y-%m-%d %H:%M:%S")
+        start_datetime = (self.datetime - timedelta(hours=MAX_TIME_INTERVAL))
 
-        update_data = merged_data[merged_data[first_time_col].between(start_time, self.time, 'both')]
+        update_data = merged_data[merged_data[first_time_col].between(start_datetime, self.datetime, 'both')]
 
         # 根据coin_name和spider_web筛选出to_be_filter_data数据
         coin_spider_data = to_be_filter_data[primary_key_columns]
@@ -330,8 +329,7 @@ class MinuteFunctionHandler(FunctionHandler):
         range_data = self.range_data
         # self.datetime = datetime(2024,11,6, 10, 0, 0)
         datetime_A = self.datetime - timedelta(hours=MAX_TIME_INTERVAL)
-        timestr_A = datetime_A.strftime('%Y-%m-%d %H:%M:%S')
-        data_A_to_B = range_data[range_data['time'].between(timestr_A, self.time, inclusive='both')]
+        data_A_to_B = range_data[range_data['time'].between(datetime_A, self.datetime, inclusive='both')]
 
         # AB跌涨幅筛选
         change_A_to_B_data = self.filter_by_change_rate(data_A_to_B, 'le', AB_CHANGE)
@@ -365,6 +363,9 @@ class MinuteFunctionHandler(FunctionHandler):
         # 更新记录数据
         try:
             record_data = pd.read_csv(RECORD_DATA_PATH, encoding='utf-8')
+            for column in record_data.columns:
+                if 'time' in column:  # 检查列名是否包含"时间"
+                    record_data[column] = pd.to_datetime(record_data[column])
         except FileNotFoundError:
             record_data = pd.DataFrame(columns=['coin_name', 'spider_web', 'time_A', 'time_B', 'first_price', 'cnt'])
 
@@ -414,21 +415,19 @@ class DayFunctionHandler(FunctionHandler):
         decline_and_virtual_drop_data_A = self.filter_by_virtual_drop(decline_data_A, 'ge', VIRTUAL_DROP)
 
         fourth_day_ahead_datetime = self.datetime - timedelta(days=4)
-        fourth_day_ahead_timestr = fourth_day_ahead_datetime.strftime('%Y-%m-%d %H:%M:%S')
 
         third_day_ahead_datetime = self.datetime - timedelta(days=3)
-        third_day_ahead_timestr = third_day_ahead_datetime.strftime('%Y-%m-%d %H:%M:%S')
         # 前四天数据
         fourth_day_ahead_data = self.range_data_day[
             ['coin_name', 'spider_web', 'change', 'time']]
         fourth_day_ahead_data = fourth_day_ahead_data[
-            fourth_day_ahead_data['time'].between(fourth_day_ahead_timestr, self.time, inclusive='left')].copy()
+            fourth_day_ahead_data['time'].between(fourth_day_ahead_datetime, self.datetime, inclusive='left')].copy()
 
         decline_fourth_day_ahead_data = self.filter_by_change_rate(fourth_day_ahead_data, 'lt', CUR_CHANGE).copy()
 
         # 前三天数据
         third_day_ahead_data = fourth_day_ahead_data[
-            fourth_day_ahead_data['time'].between(third_day_ahead_timestr, self.time, inclusive='both')]
+            fourth_day_ahead_data['time'].between(third_day_ahead_datetime, self.datetime, inclusive='both')]
         decline_third_day_ahead_data = self.filter_by_change_rate(third_day_ahead_data, 'lt', CUR_CHANGE).copy()
 
         # 合并
@@ -473,18 +472,18 @@ class DayFunctionHandler(FunctionHandler):
 if __name__ == "__main__":
     csv_reader = CSVReader(data_region='China')
 
-    data = pd.read_csv(r"D:\PythonCode\virtual_currency-3.0\test.csv")
-    data = csv_reader.change_data_type(data, only_price=False)
+    data = pd.read_csv(r"D:\PythonCode\virtual_currency-3.0\data_00.csv")
+    data = csv_reader.change_data_type(data, only_price=True)
 
     # hourly_function_hander = HourlyFunctionHandler(reader=csv_reader, time='2024-11-06 10:00:00', data=data)
 
     # hourly_function_hander.get_range_data_hours("2024-11-05 10:00:00", "2024-11-06 10:00:00", inclusive='left')
     # hourly_function_hander.change_and_virtual_drop_and_price_func_1()
 
-    # minute_function_handler = MinuteFunctionHandler(reader=csv_reader, time='2024-11-06 10:00:00', data=data)
-    # minute_function_handler.get_range_data_hours("2024-11-05 10:00:00", "2024-11-06 10:00:00", inclusive='left')
-    # minute_function_handler.change_and_virtual_drop_and_price_func_1_minute()
+    minute_function_handler = MinuteFunctionHandler(reader=csv_reader, time='2024-11-08 22:19:00', data=data)
+    minute_function_handler.get_range_data_hours(datetime(2024,11,7,22,19,0), datetime(2024,11,8,22,19,0), inclusive='left')
+    minute_function_handler.change_and_virtual_drop_and_price_func_1_minute()
 
-    dayfunctionhandler = DayFunctionHandler(reader=csv_reader, time='2024-11-06 10:00:00', data=data)
-    dayfunctionhandler.get_range_data_days("2024-11-05 00:00:00", "2024-11-06 00:00:00", inclusive='left')
-    dayfunctionhandler.continous_change_drop_func_1()
+    # dayfunctionhandler = DayFunctionHandler(reader=csv_reader, time='2024-11-06 10:00:00', data=data)
+    # dayfunctionhandler.get_range_data_days("2024-11-05 00:00:00", "2024-11-06 00:00:00", inclusive='left')
+    # dayfunctionhandler.continous_change_drop_func_1()
