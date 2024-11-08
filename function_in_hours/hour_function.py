@@ -151,7 +151,6 @@ class FunctionHandler:
 
     def execute_all(self):
         # 执行所有函数
-        self.results = []
         for func in self.functions:
             res = func()
             if res:
@@ -198,11 +197,7 @@ class HourlyFunctionHandler(FunctionHandler):
         datetime_A = self.datetime - timedelta(hours=MAX_TIME_INTERVAL)
         timestr_A = datetime_A.strftime('%Y-%m-%d %H:%M:%S')
         data_A_to_B = data_A_to_B[data_A_to_B['time'].between(timestr_A, self.time, inclusive='left')]
-
-        data_A_to_B = data_A_to_B.merge(change_data_at_C[['coin_name', 'spider_web']], on=['coin_name', 'spider_web'], how='right')
-        if data_A_to_B.empty:
-            return
-
+        data_A_to_B = data_A_to_B[data_A_to_B['coin_name'].isin(change_data_at_C['coin_name'])]
         data_A_to_B_sort_by_time_asc = data_A_to_B.sort_values('time', ascending=True)
 
         change_data_A_to_B = self.filter_by_change_rate(data_A_to_B_sort_by_time_asc, 'le', AB_CHANGE)
@@ -211,10 +206,8 @@ class HourlyFunctionHandler(FunctionHandler):
 
         merged_ABC_data = virtual_drop_and_change_data_A_to_B.merge(
             change_data_at_C[['coin_name', 'spider_web', 'close']],
-            on=['coin_name', 'spider_web'], how='right', suffixes=('', '_C')).dropna()
-
-        if merged_ABC_data.empty:
-            return
+            on=['coin_name', 'spider_web'], how='right', suffixes=('', '_C'))
+        merged_ABC_data.dropna(inplace=True)
 
         condition_C_close_less_AB_min = (merged_ABC_data['close_C'] <= merged_ABC_data['low'])
         conform_C_close_AB_min = merged_ABC_data[condition_C_close_less_AB_min]
@@ -340,11 +333,6 @@ class MinuteFunctionHandler(FunctionHandler):
         timestr_A = datetime_A.strftime('%Y-%m-%d %H:%M:%S')
         data_A_to_B = range_data[range_data['time'].between(timestr_A, self.time, inclusive='both')]
 
-        data_A_to_B = data_A_to_B.merge(C_data[['coin_name', 'spider_web']], on=['coin_name', 'spider_web'],how='right')
-
-        if data_A_to_B.empty:
-            return
-
         # AB跌涨幅筛选
         change_A_to_B_data = self.filter_by_change_rate(data_A_to_B, 'le', AB_CHANGE)
         # AB虚降筛选
@@ -354,9 +342,7 @@ class MinuteFunctionHandler(FunctionHandler):
         # AB收盘价与C价格对比
         merged_ABC_data = change_and_virtual_drop_data_A_to_B.merge(C_data[['coin_name', 'spider_web', 'coin_price']],
                                                                     on=['coin_name', 'spider_web'], how='right',
-                                                                    suffixes=('', '_C')).dropna()
-        if merged_ABC_data.empty:
-            return
+                                                                    suffixes=('', '_C')).dropna(inplace=True)
 
         AB_low_gt_C_price_condition = (merged_ABC_data['low'] > merged_ABC_data['coin_price_C'])
 
@@ -434,8 +420,6 @@ class DayFunctionHandler(FunctionHandler):
         # 前四天数据
         fourth_day_ahead_data = self.range_data_day[
             ['coin_name', 'spider_web', 'change', 'time']]
-        if fourth_day_ahead_data.empty:
-            return
         fourth_day_ahead_data = fourth_day_ahead_data[
             fourth_day_ahead_data['time'].between(fourth_day_ahead_timestr, self.time, inclusive='left')].copy()
 
@@ -485,7 +469,7 @@ class DayFunctionHandler(FunctionHandler):
         else:
             logger.info('日函数1无异常')
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     csv_reader = CSVReader(data_region='China')
 
     data = pd.read_csv(r"D:\PythonCode\virtual_currency-3.0\test.csv")
