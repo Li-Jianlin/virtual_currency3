@@ -120,7 +120,7 @@ class CSVReader:
             else:
                 combined_data = pd.concat([combined_data, target_data], axis=0, ignore_index=True)
         if not combined_data.empty:
-            combined_data['time'] = pd.to_datetime(combined_data['time'])
+            combined_data['time'] = pd.to_datetime(combined_data['time'], format='%Y-%m-%d %H:%M:%S')
             combined_data = combined_data[combined_data['time'].between(start_datetime, end_datetime, inclusive=inclusive)]
         return combined_data
 
@@ -191,10 +191,11 @@ class CSVWriter:
         else:
             raise KeyError('unit_time参数只能是hour或day')
         target_file_path = os.path.join(target_file_folder, target_file_name)
+        # data['time'] = data['time'].dt.strftime("%Y-%m-%d %H:%M:%S")
         if os.path.exists(target_file_path):
-            data.to_csv(target_file_path, mode='a', header=False, index=False, encoding='utf-8')
+            data.to_csv(target_file_path, mode='a', header=False, index=False, encoding='utf-8', date_format='%Y-%m-%d %H:%M:%S')
         else:
-            data.to_csv(target_file_path, index=False, encoding='utf-8')
+            data.to_csv(target_file_path, index=False, encoding='utf-8', date_format='%Y-%m-%d %H:%M:%S')
 
     def write_detail_data(self, data: pd.DataFrame):
         """将当前爬取的详细数据写入到detail_data文件中"""
@@ -218,9 +219,9 @@ class CSVWriter:
             self.is_check = True
 
         if cur_datetime.minute == 0 or not os.path.exists(target_file_path):
-            data.to_csv(target_file_path, index=False, encoding='utf-8')
+            data.to_csv(target_file_path, index=False, encoding='utf-8', date_format='%Y-%m-%d %H:%M:%S')
         else:
-            data.to_csv(target_file_path, mode='a', header=False, index=False, encoding='utf-8')
+            data.to_csv(target_file_path, mode='a', header=False, index=False, encoding='utf-8', date_format='%Y-%m-%d %H:%M:%S')
         logger.info(f'写入详细数据成功-{self.data_region}')
 
     def write_statistical_table(self, statictical_table, unit_time: Literal['hour', 'day']):

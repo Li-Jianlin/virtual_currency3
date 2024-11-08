@@ -372,7 +372,7 @@ class MinuteFunctionHandler(FunctionHandler):
         filter_data, record_data = self.filter_and_update_data(A_close_gt_B_close_data, record_data, MAX_TIME_INTERVAL)
 
         if not record_data.empty:
-            record_data.to_csv(RECORD_DATA_PATH, index=False, encoding='utf-8')
+            record_data.to_csv(RECORD_DATA_PATH, index=False, encoding='utf-8', date_format='%Y-%m-%d %H:%M:%S')
         cur_res_list = []
         if not filter_data.empty:
             filter_data.sort_values(['coin_name', 'spider_web'], ascending=[True, True], inplace=True)
