@@ -35,13 +35,15 @@ class SpiderBySelenium(Spider):
         self.options = Options()
         self.options.add_argument('--headless')
         self.options.add_argument("--disable-gpu")  # 禁用GPU加速
+        self.options.add_argument('--no-sandbox')
+        self.options.add_argument('--disable-extensions') # 禁用拓展
+        self.options.add_argument('--disable-images')
         self.options.page_load_strategy = 'none' # 不等待页面加载完成
         # 关闭浏览器上部提示语：Chrome正在受到自动软件的控制
         self.options.add_experimental_option('excludeSwitches', ['enable-automation'])
         self.options.add_experimental_option('useAutomationExtension', False)
         self.options.add_argument("--window-size=1920,1080")  # 设置浏览器分辨率（窗口大小）
         self.options.add_argument("blink-settings=imagesEnabled=false")  # 不加载图片, 提升速度
-        self.options.add_argument('--no-sandbox')  # 解决DevToolsActivePort文件不存在的报错
         self.options.add_argument('--hide-scrollbars')  # 隐藏滚动条, 应对一些特殊页面
         self.options.add_argument(
             f'user-agent={self.headers["User-Agent"]}')
