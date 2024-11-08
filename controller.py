@@ -1,7 +1,7 @@
 import os
 from typing import Literal
 import pandas as pd
-from threading import  Thread, Lock
+from threading import Thread, Lock
 from datetime import datetime, timedelta
 
 base_folder = os.path.join(os.path.dirname(__file__), 'log')
@@ -13,6 +13,7 @@ from dataio.csv_handler import CSVReader, CSVWriter
 from data_process.data_process import DataProcess
 from config import SpiderWeb
 from msg_log.mylog import get_logger
+from function_in_hours.hour_function import HourlyFunctionHandler, DayFunctionHandler, MinuteFunctionHandler
 
 PROJECT_ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', 'controll.log'))
@@ -31,7 +32,8 @@ class ProgramCotroller:
         self.writer = CSVWriter(data_region=data_region, base_file_path=self.base_file_path.get(data_region))
         self.cur_datetime = datetime.now().replace(second=0)
         self.cur_time = self.cur_datetime.strftime("%Y-%m-%d %H:%M:%S")
-
+        self.pre_hour_datetime = self.cur_datetime - timedelta(hours=1)
+        self.pre_hour_strtime = self.pre_hour_datetime.strftime("%Y-%m-%d %H:%M:%S")
         # 爬虫
         logger.info('初始化数据爬取器')
         self.binance_data_getter = DataGetter(SpiderWeb.BINANCE)
@@ -42,18 +44,21 @@ class ProgramCotroller:
                                           writer=self.writer,
                                           reader=self.reader, time=self.cur_time)
         logger.info('初始化成功')
+
     def change_data_region(self, data_region: Literal['China', 'Foreign']):
         """改变读写器路径"""
         self.reader.base_file_path = self.base_file_path.get(data_region)
         self.writer.base_file_path = self.base_file_path.get(data_region)
 
-    def change_data_processer(self, data: pd.DataFrame, time: str, unit_time='hour', data_region='China'):
+    def change_data_processer(self, data: pd.DataFrame, time: str, unit_time='hour', data_region='China',
+                              cur_datetime: datetime):
         """修改数据计算对象的相关属性"""
 
         self.data_processer.data = data
         self.data_processer.time = time
         self.data_processer.unit_time = unit_time
         self.data_processer.data_region = data_region
+        self.data_processer.datetime = cur_datetime
 
     def add_time_column(self, cur_time: str, data: pd.DataFrame):
         """为当前数据加上时间列"""
@@ -94,16 +99,27 @@ class ProgramCotroller:
         calculated_data = self.data_processer.data
         return calculated_data
 
-    def get_time(self, cur_time: datetime):
+    def get_time(self, cur_datetime: datetime):
         """得到当前时间"""
+        self.cur_datetime = cur_datetime
         self.cur_minute = cur_datetime.minute
         self.cur_time = cur_datetime.strftime("%Y-%m-%d %H:%M:%S")
         self.foreign_datetime = cur_datetime - timedelta(hours=8)
         self.foreign_time = self.foreign_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        self.pre_hour_datetime = cur_datetime - timedelta(hours=1)
+        self.pre_hour_strtime = self.pre_hour_datetime.strftime("%Y-%m-%d %H:%M:%S")
+
 
 logger.info('启动程序')
 
 controller = ProgramCotroller('China')
+hourfunctionhandler = HourlyFunctionHandler(data=None, reader=controller.reader, writer=controller.writer,
+                                            time=controller.cur_time)
+dayfunctionhandler = DayFunctionHandler(data=None, reader=controller.reader, writer=controller.writer,
+                                        time=controller.cur_time)
+minutefunctionhandler = MinuteFunctionHandler(data=None, reader=controller.reader, writer=controller.writer,
+                                              time=controller.cur_time)
+hourfunctionhandler.add_function(hourfunctionhandler.change_and_virtual_drop_and_price_func_1)
 
 while True:
     cur_datetime = datetime.now()
@@ -132,7 +148,8 @@ while True:
             logger.info('计算国内整点数据')
             controller.change_data_region('China')
             controller.change_data_processer(data=combined_data.copy(), time=controller.cur_time,
-                                                               unit_time='hour')
+                                             cur_datetime=controller.cur_datetime,
+                                             unit_time='hour')
             logger.info('开始计算')
             calculated_data = controller.calculate_data()
             pre_time = (controller.cur_datetime - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
@@ -141,18 +158,25 @@ while True:
             controller.writer.write_data(calculated_data, unit_time='hour')
             logger.info('写入完成，生成国际数据')
             foreign_calculated_data = calculated_data.copy()
-            foreign_calculated_data['time'] = (controller.foreign_datetime - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+            foreign_calculated_data['time'] = (controller.foreign_datetime - timedelta(hours=1)).strftime(
+                "%Y-%m-%d %H:%M:%S")
             controller.change_data_region('Foreign')
             controller.writer.write_data(foreign_calculated_data, unit_time='hour')
             logger.info('国际数据写入完成')
 
+            # 小时函数
+            hourfunctionhandler.data = calculated_data
+            pre_24_hours_strtime = (controller.pre_hour_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+            hourfunctionhandler.get_range_data_hours(pre_24_hours_strtime, controller.cur_time, inclusive='left')
+            hourfunctionhandler.execute_all()
 
         # 国内0点
         if cur_datetime.hour == 0 and controller.cur_minute == 0:
             logger.info('计算国内0点数据')
             controller.change_data_region('China')
             controller.change_data_processer(data=combined_data.copy(), time=controller.cur_time,
-                                                               unit_time='day')
+                                             cur_datetime=controller.cur_datetime,
+                                             unit_time='day')
             logger.info('开始计算')
             calculated_data_day = controller.calculate_data()
             calculated_data_day['time'] = (controller.cur_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
@@ -165,9 +189,12 @@ while True:
             logger.info('计算国际0点数据')
             controller.change_data_region('Foreign')
             controller.change_data_processer(data=foreign_data.copy(), time=controller.foreign_time,
-                                                               unit_time='day', data_region='Foreign')
+                                             cur_datetime=controller.foreign_datetime,
+                                             unit_time='day',
+                                             data_region='Foreign')
             calculated_data_foreign_day = controller.calculate_data()
-            calculated_data_foreign_day['time'] = (controller.foreign_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+            calculated_data_foreign_day['time'] = (controller.foreign_datetime - timedelta(days=1)).strftime(
+                "%Y-%m-%d %H:%M:%S")
             logger.info('计算完成，写入数据')
             controller.writer.write_data(calculated_data_foreign_day, unit_time='day')
 
