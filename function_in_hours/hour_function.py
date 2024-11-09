@@ -15,7 +15,7 @@ logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', 'f
 def find_A_close_gt_B_close_included_C_close(group):
     """寻找AB时刻符合A收盘价大于B收盘价关系的数据"""
     coin_name, spider_web = group.name
-    group.sort_values(by='time', ascending=True)
+    group.sort_values(by='time', ascending=True, inplace=True)
     close_price = group['close'].tolist()
     result = []
     for i in range(len(close_price) - 1):
@@ -41,7 +41,7 @@ def find_A_close_gt_B_close_included_C_close(group):
 def find_A_close_gt_B_close_Exclusive_of_C_close(group):
     """寻找AB时刻符合A收盘价大于B收盘价关系的数据"""
     coin_name, spider_web = group.name
-    group.sort_values(by='time', ascending=True)
+    group.sort_values(by='time', ascending=True, inplace=True)
     close_price = group['close'].tolist()
     result = []
     for i in range(len(close_price) - 1):
