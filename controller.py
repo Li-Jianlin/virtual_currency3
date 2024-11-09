@@ -214,6 +214,7 @@ controller = ProgramCotroller('China')
 controller.create_function_handler()
 controller.add_funtion_to_handler('minute')
 controller.add_funtion_to_handler('hour')
+controller.add_funtion_to_handler('day')
 
 
 while True:

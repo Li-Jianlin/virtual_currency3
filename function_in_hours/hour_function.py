@@ -209,8 +209,7 @@ class HourlyFunctionHandler(FunctionHandler):
 
         group_by_coin_and_spiderweb = conform_C_close_AB_min.groupby(['coin_name', 'spider_web'])
 
-        A_close_gt_B_close_data = group_by_coin_and_spiderweb.apply(find_A_close_gt_B_close_included_C_close,
-                                                                    include_groups=False).reset_index(drop=True)
+        A_close_gt_B_close_data = group_by_coin_and_spiderweb.apply(find_A_close_gt_B_close_included_C_close).reset_index(drop=True)
         if A_close_gt_B_close_data.empty:
             logger.warning('无符合条件的数据')
             A_close_gt_B_close_data = pd.DataFrame(
@@ -351,8 +350,7 @@ class MinuteFunctionHandler(FunctionHandler):
 
         group_by_coin_and_spiderweb = AB_low_gt_C_price_data_sort_by_time.groupby(['coin_name', 'spider_web'])
 
-        A_close_gt_B_close_data = group_by_coin_and_spiderweb.apply(find_A_close_gt_B_close_Exclusive_of_C_close,
-                                                                    include_groups=False).reset_index(drop=True)
+        A_close_gt_B_close_data = group_by_coin_and_spiderweb.apply(find_A_close_gt_B_close_Exclusive_of_C_close).reset_index(drop=True)
         if A_close_gt_B_close_data.empty:
             logger.warning('无符合条件的数据')
             A_close_gt_B_close_data = pd.DataFrame(
