@@ -152,9 +152,12 @@ class FunctionHandler:
         self.results = []
         for func in self.functions:
             if not self.range_data.empty:
-                res = func()
-                if res:
-                    self.results.append(res)
+                try:
+                    res = func()
+                    if res:
+                        self.results.append(res)
+                except Exception as e:
+                    logger.exception(e)
 
 
 class HourlyFunctionHandler(FunctionHandler):
