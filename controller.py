@@ -212,6 +212,8 @@ logger.info('启动程序')
 is_Test = False
 controller = ProgramCotroller('China')
 controller.create_function_handler()
+controller.add_funtion_to_handler('minute')
+controller.add_funtion_to_handler('hour')
 
 
 while True:

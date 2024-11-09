@@ -45,7 +45,7 @@ class SpiderBySelenium(Spider):
         self.options.add_argument("blink-settings=imagesEnabled=false")  # 不加载图片, 提升速度
         self.options.add_argument('--hide-scrollbars')  # 隐藏滚动条, 应对一些特殊页面
         self.options.add_argument(
-            f'user-agent={self.headers["User-Agent"]}')
+            f'user-agent={self.headers}')
         self.options.add_argument('--no-sandbox')
 
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.options)
@@ -55,10 +55,20 @@ class SpiderBySelenium(Spider):
 
     def get_driver(self):
         """使用有头浏览器"""
-        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-        self.wait = WebDriverWait(self.driver, 10)
+        self.options = Options()
+        self.options.add_argument("--disable-gpu")  # 禁用GPU加速
+        # self.options.add_argument('--disable-extensions') # 禁用拓展
+        # self.options.add_argument('--disable-images')
+        self.options.page_load_strategy = 'none'  # 不等待页面加载完成
+        # 关闭浏览器上部提示语：Chrome正在受到自动软件的控制
+        self.options.add_experimental_option('excludeSwitches', ['enable-automation'])
+        self.options.add_argument("blink-settings=imagesEnabled=false")  # 不加载图片, 提升速度
+        self.options.add_argument(f'--user-agent={self.headers["User-Agent"]}')
+        self.options.add_argument('--no-sandbox')
+        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.options)
+        self.wait = WebDriverWait(self.driver, 20)
         self.driver.get(self.url)
-        time.sleep(5)
+        time.sleep(45)
 
     def load_page(self):
         """根据配置文件中的加载方法将要爬取的页面全部加载出来。slide为滑动加载页面，click为点击按钮加载页面"""
@@ -116,8 +126,9 @@ class SpiderBySelenium(Spider):
 
 
 if __name__ == '__main__':
-    spider = SpiderBySelenium(SpiderWeb.COIN_GLASS)
-    spider.get_headless_driver()
+    spider = SpiderBySelenium(SpiderWeb.INVERSTING)
+    # spider.get_headless_driver()
+    spider.get_driver()
     spider.load_page()
     spider.crawl_data()
     df = spider.transform_dataframe()
