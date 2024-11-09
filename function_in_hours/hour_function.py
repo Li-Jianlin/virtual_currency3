@@ -147,6 +147,7 @@ class FunctionHandler:
 
     def execute_all(self):
         # 执行所有函数
+        self.results = []
         for func in self.functions:
             if not self.range_data.empty:
                 res = func()
