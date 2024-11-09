@@ -177,6 +177,7 @@ class ProgramCotroller:
     def execute_hour_function(self, cur_data):
         # 更新数据以及相关信息
         self.hourfunctionhandler.data = cur_data
+        self.change_data_region('China')
         # 时间
         self.hourfunctionhandler.datetime = self.pre_hour_datetime
         # 数据
