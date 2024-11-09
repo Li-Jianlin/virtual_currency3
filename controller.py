@@ -121,14 +121,13 @@ class ProgramCotroller:
                                          unit_time='hour')
         logger.info('开始计算')
         calculated_data = self.calculate_data()
-        pre_time = (self.cur_datetime - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+        pre_time = self.cur_datetime - timedelta(hours=1)
         calculated_data['time'] = pre_time
         logger.info('计算完成，写入数据')
         self.writer.write_data(calculated_data, unit_time='hour')
         logger.info('写入完成，生成国际数据')
         foreign_calculated_data = calculated_data.copy()
-        foreign_calculated_data['time'] = (self.foreign_datetime - timedelta(hours=1)).strftime(
-            "%Y-%m-%d %H:%M:%S")
+        foreign_calculated_data['time'] = self.foreign_datetime - timedelta(hours=1)
         self.change_data_region('Foreign')
         self.writer.write_data(foreign_calculated_data, unit_time='hour')
         logger.info('国际数据写入完成')
@@ -149,7 +148,7 @@ class ProgramCotroller:
                                          unit_time='day')
         logger.info('开始计算')
         calculated_data_day = self.calculate_data()
-        calculated_data_day['time'] = (cur_datetime - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+        calculated_data_day['time'] = cur_datetime - timedelta(days=1) - timedelta(hours=1)
         logger.info('计算完成，写入数据')
         self.writer.write_data(calculated_data_day, unit_time='day')
         logger.info('写入完成')
@@ -210,9 +209,10 @@ class ProgramCotroller:
             return res_str
 
 logger.info('启动程序')
-
+is_Test = False
 controller = ProgramCotroller('China')
 controller.create_function_handler()
+
 
 while True:
     cur_datetime = datetime.now().replace(microsecond=0)
@@ -246,20 +246,20 @@ while True:
 
             res_hour = controller.execute_hour_function(calculated_data)
             if res_hour:
-                send_email(subject='每小时函数结果', content=res_hour, test=True)
+                send_email(subject='每小时函数结果-v1', content=res_hour, test=is_Test)
 
         # 国内0点
-        if cur_datetime.hour == 0 and controller.cur_minute == 0:
+        if cur_datetime.hour == 1 and controller.cur_minute == 0:
             calculated_data_day = controller.days_data_process(combined_data.copy(), data_region='China')
             res_day = controller.execute_day_function(calculated_data_day)
             if res_day:
-                send_email(subject='每天函数结果', content=res_day, test=True)
+                send_email(subject='每天函数结果-v1', content=res_day, test=is_Test)
         # 国际0点（国内8点）
-        if cur_datetime.hour == 8 and controller.cur_minute == 0:
+        if cur_datetime.hour == 9 and controller.cur_minute == 0:
             calculated_data_day_foreign = controller.days_data_process(foreign_data.copy(), data_region='Foreign')
             res_day_foreign = controller.execute_day_function(calculated_data_day_foreign)
             if res_day_foreign:
-                send_email(subject='国际每天函数结果', content=res_day_foreign, test=True)
+                send_email(subject='国际每天函数结果-v1', content=res_day_foreign, test=is_Test)
 
         # 不是整点
         logger.info('写入详情数据')
@@ -272,5 +272,5 @@ while True:
         controller.change_data_region('China')
         res_minute = controller.execute_minute_function(combined_data)
         if res_minute:
-            send_email(subject='分钟函数结果', content=res_minute, test=True)
+            send_email(subject='分钟函数结果-v1', content=res_minute, test=is_Test)
         logger.info('执行完毕')

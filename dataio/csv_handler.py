@@ -60,7 +60,8 @@ class CSVReader:
             target_web_data = pd.read_csv(filled_data_path, low_memory=False, encoding='utf-8', dtype='str')
         except FileNotFoundError:
             logger.warning(f'{filled_data_path}文件不存在')
-            target_web_data = pd.DataFrame()
+            target_web_data = pd.DataFrame(columns=['coin_name','spider_web','coin_price','time','high','low',
+                                                               'open','close','change','amplitude','virtual_drop'])
         return target_web_data
 
     def get_previous_all_data(self, cur_datetime: datetime, unit_time: Literal['hour', 'day']):
@@ -81,7 +82,8 @@ class CSVReader:
             target_data['time'] = pd.to_datetime(target_data['time'])
         except FileNotFoundError:
             logger.warning(f'{target_file_path}文件不存在')
-            target_data = pd.DataFrame()
+            target_data = pd.DataFrame(columns=['coin_name','spider_web','coin_price','time','high','low',
+                                                               'open','close','change','amplitude','virtual_drop'])
         return target_data
 
     def get_detail_data(self):
@@ -93,7 +95,7 @@ class CSVReader:
             detail_data['time'] = pd.to_datetime(detail_data['time'])
         except FileNotFoundError:
             logger.warning(f'{detail_data_path}文件不存在')
-            detail_data = pd.DataFrame()
+            detail_data = pd.DataFrame(columns=['coin_name','spider_web','coin_price','time'])
         return detail_data
 
     def get_data_between_hours(self, start_datetime: datetime, end_datetime: datetime, inclusive: Literal["both", "neither", "left", "right"] = "both" ):
@@ -116,7 +118,8 @@ class CSVReader:
 
             except FileNotFoundError:
                 logger.warning(f'{file_path}文件不存在')
-                target_data = pd.DataFrame()
+                target_data = pd.DataFrame(columns=['coin_name','spider_web','coin_price','time','high','low',
+                                                               'open','close','change','amplitude','virtual_drop'])
             else:
                 combined_data = pd.concat([combined_data, target_data], axis=0, ignore_index=True)
         if not combined_data.empty:
@@ -153,6 +156,9 @@ class CSVReader:
             combined_data['time'] = pd.to_datetime(combined_data['time'])
             combined_data = combined_data[combined_data['time'].between(start_datetime, end_datetime, inclusive=inclusive)]
             combined_data = self.change_data_type(combined_data, only_price=False)
+        else:
+            combined_data = pd.DataFrame(columns=['coin_name','spider_web','coin_price','time','high','low',
+                                                               'open','close','change','amplitude','virtual_drop'])
         return combined_data
 
     def get_statistical_table(self, unit_time: Literal['hour', 'day']):

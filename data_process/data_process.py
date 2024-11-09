@@ -49,11 +49,13 @@ class DataProcess:
         if self.unit_time == 'hour':
             self.combined_data = pd.concat([self.data, self.detail_data], ignore_index=True)
         else:
-            self.previous_all_data = self.csv_reader.get_previous_all_data(self.datetime, 'hour')
+            self.previous_all_data = self.csv_reader.get_data_between_hours(self.datetime - timedelta(days=1) - timedelta(hours=1),
+                                                                            self.datetime, 'both')
             if self.previous_all_data.empty:
                 logger.warning(f'{self.time}之前没有数据')
                 # 没有小时数据
-                self.previous_all_data = pd.DataFrame()
+                self.previous_all_data = pd.DataFrame(columns=['coin_name','spider_web','coin_price','time','high','low',
+                                                               'open','close','change','amplitude','virtual_drop'])
             self.combined_data = self.previous_all_data
 
         self.combined_data.drop_duplicates(inplace=True)
