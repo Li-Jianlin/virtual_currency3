@@ -3,7 +3,7 @@ from typing import Literal
 import pandas as pd
 from threading import Thread, Lock
 from datetime import datetime, timedelta
-
+from decimal import Decimal
 base_folder = os.path.join(os.path.dirname(__file__), 'log')
 if not os.path.exists(base_folder):
     os.makedirs(base_folder, exist_ok=True)
@@ -13,8 +13,11 @@ from dataio.csv_handler import CSVReader, CSVWriter
 from data_process.data_process import DataProcess
 from config import SpiderWeb
 from msg_log.mylog import get_logger
-from function_in_hours.hour_function import HourlyFunctionHandler, DayFunctionHandler, MinuteFunctionHandler
+from function_handler.minute_function_handler import MinuteFunctionHandler
+from function_handler.hour_function_handler import HourlyFunctionHandler
+from function_handler.day_function_handler import DayFunctionHandler
 from msg_log.msg_send import send_email
+
 PROJECT_ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', 'controll.log'))
 
@@ -113,6 +116,21 @@ class ProgramCotroller:
         self.foreign_time = self.foreign_datetime.strftime("%Y-%m-%d %H:%M:%S")
         self.pre_hour_datetime = cur_datetime - timedelta(hours=1)
         self.pre_day_datetime = cur_datetime - timedelta(days=1)
+
+    @ staticmethod
+    def update_45_day_max_price(cur_day_data: pd.DataFrame):
+        file_path = os.path.join(PROJECT_ROOT_PATH, 'function_handler', 'record_data', '45_day_max_price.csv')
+        max_price_45_day_data = pd.read_csv(file_path, encoding='utf-8', low_memory=False)
+        max_price_45_day_data['max_price_in_45_day'] = max_price_45_day_data['max_price_in_45_day'].apply(Decimal)
+        cur_data_high = cur_day_data.groupby('coin_name')['high'].apply('max').reset_index(drop=False)
+        # 如果当前最高价高于45天最高价，则更新45天最高价
+        merged_data = max_price_45_day_data.merge(cur_data_high, on='coin_name', how='outer')
+        merged_data = merged_data.fillna(Decimal('0'))
+        merged_data['max_price_in_45_day'] = merged_data.apply(lambda x: x['high'] if x['high'] > x['max_price_in_45_day'] else x['max_price_in_45_day'], axis=1)
+        merged_data.drop(columns=['high'], inplace=True)
+        merged_data.to_csv(file_path, index=False, encoding='utf-8')
+
+
     def hours_data_process(self, combined_data):
         logger.info('计算国内整点数据')
         self.change_data_region('China')
@@ -165,12 +183,14 @@ class ProgramCotroller:
 
     def add_funtion_to_handler(self, unit_time: Literal['hour', 'day', 'minute']):
         if unit_time == 'hour':
-            self.hourfunctionhandler.add_function(self.hourfunctionhandler.change_and_virtual_drop_and_price_func_1)
-        # if unit_time == 'day':
-        #     self.dayfunctionhandler.add_function()
+            self.hourfunctionhandler.add_function([self.hourfunctionhandler.change_and_virtual_drop_and_price_func_1])
+
+        if unit_time == 'day':
+            self.dayfunctionhandler.add_function([self.dayfunctionhandler.continous_change_drop_func_1])
 
         if unit_time == 'minute':
-            self.minutefunctionhandler.add_function(self.minutefunctionhandler.change_and_virtual_drop_and_price_func_1_minute)
+            self.minutefunctionhandler.add_function([self.minutefunctionhandler.change_and_virtual_drop_and_price_func_1_minute,
+                                                    self.minutefunctionhandler.current_price_compare_with_45_day_max_price])
 
 
     # 执行小时函数
@@ -255,6 +275,7 @@ while True:
         # 国内0点
         if cur_datetime.hour == 1 and controller.cur_minute == 0:
             calculated_data_day = controller.days_data_process(combined_data.copy(), data_region='China')
+            controller.update_45_day_max_price(calculated_data_day.copy())
             res_day = controller.execute_day_function(calculated_data_day)
             if res_day:
                 send_email(subject='每天函数结果-v1', content=res_day, test=is_Test)

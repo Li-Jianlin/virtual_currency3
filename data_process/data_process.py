@@ -59,7 +59,7 @@ class DataProcess:
             self.combined_data = self.previous_all_data
 
         self.combined_data.drop_duplicates(inplace=True)
-        self.combined_data = self.combined_data.merge(self.data[['coin_name', 'spider_web']], on=['coin_name', 'spider_web'], how='right')
+        self.combined_data = self.combined_data.merge(self.data[['coin_name', 'spider_web']], on=['coin_name', 'spider_web'], how='inner')
         return self
 
     def fill_na(self):
