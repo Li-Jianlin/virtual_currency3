@@ -122,6 +122,7 @@ class ProgramCotroller:
         file_path = os.path.join(PROJECT_ROOT_PATH, 'function_handler', 'record_data', '45_day_max_price.csv')
         max_price_45_day_data = pd.read_csv(file_path, encoding='utf-8', low_memory=False)
         max_price_45_day_data['max_price_in_45_day'] = max_price_45_day_data['max_price_in_45_day'].apply(Decimal)
+        cur_day_data = cur_day_data[cur_day_data['spider_web'] == 'binance'].copy()
         cur_data_high = cur_day_data.groupby('coin_name')['high'].apply('max').reset_index(drop=False)
         # 如果当前最高价高于45天最高价，则更新45天最高价
         merged_data = max_price_45_day_data.merge(cur_data_high, on='coin_name', how='outer')
@@ -229,73 +230,75 @@ class ProgramCotroller:
             res_str = '\n'.join(self.minutefunctionhandler.results)
             return res_str
 
-logger.info('启动程序')
-is_Test = False
-controller = ProgramCotroller('China')
-controller.create_function_handler()
-controller.add_funtion_to_handler('minute')
-controller.add_funtion_to_handler('hour')
-controller.add_funtion_to_handler('day')
+if __name__ == '__main__':
+
+    logger.info('启动程序')
+    is_Test = False
+    controller = ProgramCotroller('China')
+    controller.create_function_handler()
+    controller.add_funtion_to_handler('minute')
+    controller.add_funtion_to_handler('hour')
+    controller.add_funtion_to_handler('day')
 
 
-while True:
-    cur_datetime = datetime.now().replace(microsecond=0)
-    if cur_datetime.second == 0:
-        # 更新时间
-        controller.update_time(cur_datetime)
-        logger.info('爬取数据')
+    while True:
+        cur_datetime = datetime.now().replace(microsecond=0)
+        if cur_datetime.second == 0:
+            # 更新时间
+            controller.update_time(cur_datetime)
+            logger.info('爬取数据')
 
-        controller.get_data_by_multithreading()
+            controller.get_data_by_multithreading()
 
-        if not controller.res:
-            logger.warning(f"爬取失败,终止后续操作")
-            continue
-        combined_data = pd.concat(controller.res, ignore_index=True)
-        if combined_data.empty:
-            logger.warning(f"当前数据为空,终止后续操作")
-            continue
+            if not controller.res:
+                logger.warning(f"爬取失败,终止后续操作")
+                continue
+            combined_data = pd.concat(controller.res, ignore_index=True)
+            if combined_data.empty:
+                logger.warning(f"当前数据为空,终止后续操作")
+                continue
 
-        logger.info('为数据增加time列')
-        combined_data = controller.add_time_column(combined_data)
-        # 改变coin_price字段数据类型
-        combined_data = controller.reader.change_data_type(combined_data, only_price=True)
-        # 生成国际数据
-        foreign_data = combined_data.copy()
-        foreign_data['time'] = controller.foreign_datetime
+            logger.info('为数据增加time列')
+            combined_data = controller.add_time_column(combined_data)
+            # 改变coin_price字段数据类型
+            combined_data = controller.reader.change_data_type(combined_data, only_price=True)
+            # 生成国际数据
+            foreign_data = combined_data.copy()
+            foreign_data['time'] = controller.foreign_datetime
 
-        # 国内整点(每小时)
-        if controller.cur_minute == 0:
-            # 计算
-            calculated_data = controller.hours_data_process(combined_data=combined_data.copy())
+            # 国内整点(每小时)
+            if controller.cur_minute == 0:
+                # 计算
+                calculated_data = controller.hours_data_process(combined_data=combined_data.copy())
 
-            res_hour = controller.execute_hour_function(calculated_data)
-            if res_hour:
-                send_email(subject='每小时函数结果-v1', content=res_hour, test=is_Test)
+                res_hour = controller.execute_hour_function(calculated_data)
+                if res_hour:
+                    send_email(subject='每小时函数结果-v1', content=res_hour, test=is_Test)
 
-        # 国内0点
-        if cur_datetime.hour == 1 and controller.cur_minute == 0:
-            calculated_data_day = controller.days_data_process(combined_data.copy(), data_region='China')
-            controller.update_45_day_max_price(calculated_data_day.copy())
-            res_day = controller.execute_day_function(calculated_data_day)
-            if res_day:
-                send_email(subject='每天函数结果-v1', content=res_day, test=is_Test)
-        # 国际0点（国内8点）
-        if cur_datetime.hour == 9 and controller.cur_minute == 0:
-            calculated_data_day_foreign = controller.days_data_process(foreign_data.copy(), data_region='Foreign')
-            res_day_foreign = controller.execute_day_function(calculated_data_day_foreign)
-            if res_day_foreign:
-                send_email(subject='国际每天函数结果-v1', content=res_day_foreign, test=is_Test)
+            # 国内0点
+            if cur_datetime.hour == 1 and controller.cur_minute == 0:
+                calculated_data_day = controller.days_data_process(combined_data.copy(), data_region='China')
+                controller.update_45_day_max_price(calculated_data_day.copy())
+                res_day = controller.execute_day_function(calculated_data_day)
+                if res_day:
+                    send_email(subject='每天函数结果-v1', content=res_day, test=is_Test)
+            # 国际0点（国内8点）
+            if cur_datetime.hour == 9 and controller.cur_minute == 0:
+                calculated_data_day_foreign = controller.days_data_process(foreign_data.copy(), data_region='Foreign')
+                res_day_foreign = controller.execute_day_function(calculated_data_day_foreign)
+                if res_day_foreign:
+                    send_email(subject='国际每天函数结果-v1', content=res_day_foreign, test=is_Test)
 
-        # 不是整点
-        logger.info('写入详情数据')
-        controller.change_data_region('China')
-        controller.writer.write_detail_data(combined_data)
-        controller.change_data_region('Foreign')
-        controller.writer.is_check = False
-        controller.writer.write_detail_data(foreign_data)
-        logger.info('详情数据写入完成,执行每分钟函数')
-        controller.change_data_region('China')
-        res_minute = controller.execute_minute_function(combined_data)
-        if res_minute:
-            send_email(subject='分钟函数结果-v1', content=res_minute, test=is_Test)
-        logger.info('执行完毕')
+            # 不是整点
+            logger.info('写入详情数据')
+            controller.change_data_region('China')
+            controller.writer.write_detail_data(combined_data)
+            controller.change_data_region('Foreign')
+            controller.writer.is_check = False
+            controller.writer.write_detail_data(foreign_data)
+            logger.info('详情数据写入完成,执行每分钟函数')
+            controller.change_data_region('China')
+            res_minute = controller.execute_minute_function(combined_data)
+            if res_minute:
+                send_email(subject='分钟函数结果-v1', content=res_minute, test=is_Test)
+            logger.info('执行完毕')
