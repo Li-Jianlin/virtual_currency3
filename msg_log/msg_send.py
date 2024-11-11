@@ -1,6 +1,7 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
+import random
 
 send_acount = [
     {
@@ -19,9 +20,9 @@ recevier_test = [
 ]
 recevier = ['2285687467@qq.com', '3145971793@qq.com']
 def send_email(subject, content, test=True):
-
-    acount = send_acount[0]['acount']
-    password = send_acount[0]['password']
+    sender_msg = random.choice(send_acount)
+    acount = sender_msg['acount']
+    password = sender_msg['password']
     mailhost = "smtp.qq.com"
 
     message = MIMEText(content, 'plain', 'utf-8')
@@ -45,4 +46,8 @@ def send_email(subject, content, test=True):
         print(e)
 
 if __name__ == '__main__':
-    send_email('test', 'test')
+    # send_email('test', 'test')
+    sender_msg = random.choice(send_acount)
+    acount = sender_msg['acount']
+    password = sender_msg['password']
+    print(acount)
