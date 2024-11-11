@@ -15,6 +15,18 @@ class DayFunctionHandler(FunctionHandler):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+    def execute_all(self):
+        # 执行所有函数
+        self.results = []
+        for func in self.functions:
+            if not self.range_data_day.empty:
+                try:
+                    res = func()
+                    if res:
+                        self.results.append(res)
+                except Exception as e:
+                    logger.exception(e)
+
     def continous_change_drop_func_1(self):
         """
         当前状态在跌
