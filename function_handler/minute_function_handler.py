@@ -198,6 +198,8 @@ class MinuteFunctionHandler(FunctionHandler):
             record_data.to_csv(RECORD_DATA_PATH, index=False, encoding='utf-8', date_format='%Y-%m-%d %H:%M:%S')
 
         cur_res_list = []
+        logger.info('每分钟函数1执行完毕')
+
         if not filter_data.empty:
             logger.info(filter_data.to_string(index=False))
             filter_data = filter_data.drop_duplicates('coin_name', keep='first')
@@ -211,8 +213,8 @@ class MinuteFunctionHandler(FunctionHandler):
 
             cur_res_str = '\n'.join(cur_res_list)
             return cur_res_str
-        else:
-            logger.info('每分钟函数1执行完毕，无异常')
+
+
 
     def current_price_compare_with_45_day_max_price(self):
         """

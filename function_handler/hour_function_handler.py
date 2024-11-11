@@ -70,21 +70,19 @@ class HourlyFunctionHandler(FunctionHandler):
 
         merged_data['time'] = merged_data['time'].fillna(self.datetime)
         merged_data['time_new'] = merged_data['time_new'].fillna(merged_data['time'])
-        merged_data['cnt'] = merged_data['cnt'].fillna(0).astype(int)
-        merged_data['cnt_new'] = merged_data['cnt_new'].fillna(0).astype(int)
+        merged_data['cnt'] = merged_data['cnt'].fillna(0).infer_objects().astype(int)
+        merged_data['cnt_new'] = merged_data['cnt_new'].fillna(0).infer_objects().astype(int)
 
         # 超过24小时全部cnt更新为0
-        merged_data  = merged_data.apply(
+        merged_data['cnt']  = merged_data.apply(
             lambda x: x['cnt_new'] if ((self.datetime - x['time']).total_seconds() / 3600) > 24
-            else x['cnt'] + x['cnt_new'],
-            axis=1
+            else x['cnt'] + x['cnt_new'], axis=1
         )
-        merged_data = merged_data.apply(
-            lambda x: self.datetime if ((self.datetime - x['time']).total_seconds() / 3600) > 24 else x['time'],
-            axis=1
+        merged_data['time'] = merged_data.apply(
+            lambda x: self.datetime if ((self.datetime - x['time']).total_seconds() / 3600) > 24 else x['time'], axis=1
         )
 
-        merged_data.to_csv(count_file_path, encoding='utf-8', index=False, date_format='%Y-%m-%d %H:%M:%S')
+        merged_data.to_csv(count_file_path, encoding='utf-8', index=False, columns=['coin_name', 'cnt', 'time'], date_format='%Y-%m-%d %H:%M:%S')
 
         original_data = original_data.merge(merged_data[['coin_name', 'cnt']], on='coin_name', how='left')
         # 如果cnt为0则更新为1
@@ -153,7 +151,7 @@ class HourlyFunctionHandler(FunctionHandler):
         A_close_gt_B_close_data = A_close_gt_B_close_data.sort_values(['spider_web', 'coin_name', 'time_A'],
                                                                       ascending=[True, True, True])
 
-        # 新增条件  C收盘价小于等于A最低价和B最低价中最小值的98%（此条件单独记录）
+        # 新增条件  C收盘价小于等于A最低价和B最低价中最小值的96%（此条件单独记录）
         C_close_le_minlow_in_AB_condition = A_close_gt_B_close_data['close_C'] <= (
                 A_close_gt_B_close_data['min_low_in_AB'] * Decimal(ADDITIONAL_PRICE_PERCENT))
 
@@ -187,22 +185,24 @@ class HourlyFunctionHandler(FunctionHandler):
             f"A时刻与C时刻不超过{MAX_TIME_INTERVAL}小时。A时刻在B时刻之前，A和B时刻均要满足虚降>={AB_VIRTUAL_DROP}%且跌涨幅<={AB_CHANGE}%，A时刻收盘价大于B时刻收盘价。"
             "C时刻收盘价同时小于A和B的最低价。")
 
+        logger.info(f'函数1执行完毕')
+
         if cur_func_result:
             cur_func_result.insert(0, func_desc)
             cur_func_result_str = '\n'.join(cur_func_result)
             # self.results.append(cur_func_result_str)
             return cur_func_result_str
 
-        logger.info(f'函数1执行完毕')
+
 
 
 if __name__ == "__main__":
     csv_reader = CSVReader(data_region='China')
 
-    data = pd.read_csv(r"D:\PythonCode\virtual_currency-3.0\aaa.csv")
+    data = pd.read_csv(r"D:\PythonCode\virtual_currency-3.0\test.csv")
     data = csv_reader.change_data_type(data, only_price=False)
 
-    hourly_function_hander = HourlyFunctionHandler(reader=csv_reader, datetime=datetime(2024,11,9,0,0,0), data=data)
+    hourly_function_hander = HourlyFunctionHandler(reader=csv_reader, datetime=datetime(2024,11,7,0,0,0), data=data)
 
-    hourly_function_hander.get_range_data_hours(datetime(2024,11,8,10,0,0), datetime(2024,11,9,0,0,0), inclusive='left')
+    hourly_function_hander.get_range_data_hours(datetime(2024,11,6,0,0,0), datetime(2024,11,7,0,0,0), inclusive='left')
     hourly_function_hander.change_and_virtual_drop_and_price_func_1()
