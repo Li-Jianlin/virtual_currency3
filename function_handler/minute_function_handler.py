@@ -170,6 +170,9 @@ class MinuteFunctionHandler(FunctionHandler):
                 columns=['coin_name', 'spider_web', 'time_A', 'time_B', 'coin_price', 'virtual_drop_A',
                          'virtual_drop_B', 'change_A',
                          'change_B'])
+            for column in A_close_gt_B_close_data.columns:
+                if 'time' in column:
+                    A_close_gt_B_close_data[column] = pd.to_datetime(A_close_gt_B_close_data[column])
 
         new_condition = ((A_close_gt_B_close_data['change_A'] <= ADDITIONAL_CHANGE) & (
                 A_close_gt_B_close_data['virtual_drop_A'] >= A_close_gt_B_close_data[
