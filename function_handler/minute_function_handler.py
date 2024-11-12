@@ -181,13 +181,15 @@ class MinuteFunctionHandler(FunctionHandler):
         conform_new_condition_data = A_close_gt_B_close_data[new_condition]
 
         # 更新记录数据
+        record_data = pd.DataFrame()
         try:
             record_data = pd.read_csv(RECORD_DATA_PATH, encoding='utf-8')
+        except FileNotFoundError:
+            record_data = pd.DataFrame(columns=['coin_name', 'spider_web', 'time_A', 'time_B', 'first_price', 'cnt'])
+        finally:
             for column in record_data.columns:
                 if 'time' in column:  # 检查列名是否包含"时间"
                     record_data[column] = pd.to_datetime(record_data[column])
-        except FileNotFoundError:
-            record_data = pd.DataFrame(columns=['coin_name', 'spider_web', 'time_A', 'time_B', 'first_price', 'cnt'])
 
         filter_data, record_data = self.filter_and_update_data(
             conform_new_condition_data[['coin_name', 'spider_web', 'time_A', 'time_B', 'coin_price', 'virtual_drop_A', 'virtual_drop_B']].copy(), record_data,

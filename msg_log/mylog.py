@@ -32,8 +32,8 @@ def get_logger(name, **kwargs):
         filename=kwargs.get('filename', os.path.join('log', f'{name}.log')),  # 日志文件名称
         when='midnight',  # 每天午夜滚动日志文件
         interval=1,  # 每 1 天滚动一次
-        backupCount=2,  # 保留最近 7 个备份文件
-        atTime=datetime.time(0, 15, 30, 0),  # 每天 00:15:30 滚动
+        backupCount=5,  # 保留最近 5 个备份文件
+        atTime=datetime.time(0, 15, 35, 0),  # 每天 00:15:35 滚动
         encoding='utf-8'
     )
 
