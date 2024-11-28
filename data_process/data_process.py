@@ -2,8 +2,9 @@ import numpy as np
 import pandas as pd
 from typing import Literal
 from decimal import Decimal
+
+from numpy.ma.core import filled
 from pandas import DataFrame
-from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 import os
 
@@ -30,7 +31,7 @@ class DataProcess:
                                                                                                 default_base_file_path)))
         self.csv_writer = kwargs.get('writer', CSVWriter(data_region, base_file_path=kwargs.get('base_file_path',
                                                                                                 default_base_file_path)))
-        self.datetime = kwargs.get('datetime' ,datetime.now().replace(second=0))
+        self.datetime = kwargs.get('datetime', datetime.now().replace(second=0))
 
         self.time = kwargs.get('time', self.datetime.strftime('%Y-%m-%d %H:%M:%S'))
         self.unit_time = unit_time
@@ -38,8 +39,10 @@ class DataProcess:
     def get_needed_data(self):
         """获取后续处理需要的数据"""
         self.data['coin_price'] = self.data['coin_price'].apply(Decimal)
-        self.data = self.data[self.data['coin_price'] != 0]
-        self.detail_data = self.csv_reader.get_detail_data()
+        self.data = self.data[self.data['coin_price'] != Decimal(0)]
+        # 删除coin_price字段为0的数据
+
+        self.detail_data = self.csv_reader.get_detail_data(cur_datetime=self.datetime)
         self.statistics_table = self.csv_reader.get_statistical_table(self.unit_time)
 
         if self.detail_data.empty:
@@ -47,24 +50,27 @@ class DataProcess:
             logger.warning(f'{self.time}没有详细数据，无法计算')
 
         if self.unit_time == 'hour':
-            self.combined_data = pd.concat([self.data, self.detail_data], ignore_index=True)
+            self.combined_data = pd.concat([self.detail_data, self.data], ignore_index=True)
         else:
-            self.previous_all_data = self.csv_reader.get_data_between_hours(self.datetime - timedelta(days=1) - timedelta(hours=1),
-                                                                            self.datetime, 'both')
+            self.previous_all_data = self.csv_reader.get_data_between_hours(
+                self.datetime - timedelta(days=1) - timedelta(hours=1),
+                self.datetime, 'both')
             if self.previous_all_data.empty:
                 logger.warning(f'{self.time}之前没有数据')
                 # 没有小时数据
-                self.previous_all_data = pd.DataFrame(columns=['coin_name','spider_web','coin_price','time','high','low',
-                                                               'open','close','change','amplitude','virtual_drop'])
+                self.previous_all_data = pd.DataFrame(
+                    columns=['coin_name', 'spider_web', 'coin_price', 'time', 'high', 'low',
+                             'open', 'close', 'change', 'amplitude', 'virtual_drop'])
             self.combined_data = self.previous_all_data
 
         self.combined_data.drop_duplicates(inplace=True)
-        self.combined_data = self.combined_data.merge(self.data[['coin_name', 'spider_web']], on=['coin_name', 'spider_web'], how='inner')
+        self.combined_data = self.combined_data.merge(self.data[['coin_name', 'spider_web']],
+                                                      on=['coin_name', 'spider_web'], how='inner')
         return self
 
     def fill_na(self):
         """缺失值填充"""
-
+        self.combined_data.sort_values('time', ascending=True, inplace=True)
         filled_data = self.combined_data.groupby(['coin_name', 'spider_web'])[['coin_price', 'time']].apply(
             lambda group: group.ffill()).reset_index(drop=False).set_index('level_2')
         lasted_data = filled_data.sort_values('time').groupby(['coin_name', 'spider_web']).tail(1)
@@ -81,7 +87,8 @@ class DataProcess:
         data['low'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('min')
         data['open'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('first')
         data['close'] = data_for_calculate_columns.groupby(['coin_name', 'spider_web'])['coin_price'].apply('last')
-
+        data['coin_price'] = data['open']
+        data = data[data['open'] > Decimal(0)].copy()
         self.data = data.reset_index()
         del data
         return self
@@ -145,13 +152,17 @@ if __name__ == '__main__':
         #     'time': ['2024-11-04 01:00:00', '2024-11-04 01:00:00', '2024-11-04 01:00:00', '2024-11-04 01:00:00',
         #              '2024-11-04 01:00:00', '2024-11-04 01:00:00']
         # })
-        data = pd.read_csv('../data_00.csv', encoding='utf-8', dtype={'coin_price': str})
-        data['coin_price'] = data['coin_price'].apply(Decimal)
-        da = DataProcess(data, 'Foreign', unit_time='day', time='2024-11-05 00:00:00'
-                         )
-        da.get_needed_data()
-        da.calculate_all()
+        data = pd.read_csv(r'D:\PythonCode\virtual_currency-3.0\data_process\test_calculate_data.csv',
+                                    encoding='utf-8', dtype={'coin_price': str})
+        data = CSVReader.change_column_type_to_Decimal(data, False)
+        # data['coin_price'] = data['coin_price'].apply(Decimal)
+        da = DataProcess(data, data_region='China', unit_time='hour')
+        # da.fill_na()
+        # da.get_needed_data()
+        # da.calculate_all()
+        da.calculate_change_rate()
+        da.calculate_amplitude()
+        da.calculate_virtual_drop()
 
-        pass
     except KeyboardInterrupt:
         print('程序被用户终止')

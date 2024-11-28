@@ -29,10 +29,11 @@ class SpiderBySelenium(Spider):
         self.web_info = CONFIG_JSON_SELENIUM.get(self.spider_web)
         self.url = self.web_info.get('url')
         self.method = self.web_info.get('method')
+        self.options = Options()
+
 
     def get_headless_driver(self):
         """使用无头浏览器"""
-        self.options = Options()
         self.options.add_argument('--headless')
         self.options.add_argument("--disable-gpu")  # 禁用GPU加速
         # self.options.add_argument('--disable-extensions') # 禁用拓展
@@ -55,7 +56,6 @@ class SpiderBySelenium(Spider):
 
     def get_driver(self):
         """使用有头浏览器"""
-        self.options = Options()
         self.options.add_argument("--disable-gpu")  # 禁用GPU加速
         # self.options.add_argument('--disable-extensions') # 禁用拓展
         # self.options.add_argument('--disable-images')
@@ -68,7 +68,7 @@ class SpiderBySelenium(Spider):
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.options)
         self.wait = WebDriverWait(self.driver, 20)
         self.driver.get(self.url)
-        time.sleep(45)
+        time.sleep(18)
 
     def load_page(self):
         """根据配置文件中的加载方法将要爬取的页面全部加载出来。slide为滑动加载页面，click为点击按钮加载页面"""
@@ -112,7 +112,7 @@ class SpiderBySelenium(Spider):
     def transform_dataframe(self):
         """生成DataFrame数据"""
         if not self.coins or not self.prices:
-            self.coin_data = pd.DataFrame()
+            self.coin_data = pd.DataFrame(columns=['coin_name', 'coin_price', 'spider_web'])
             return self.coin_data
         try:
             self.coin_data = pd.DataFrame({'coin_name': self.coins, 'coin_price': self.prices, 'spider_web': self.spider_web})
@@ -121,7 +121,7 @@ class SpiderBySelenium(Spider):
                 self.coin_data['coin_name'] = self.coin_data['coin_name'].replace('/USDT', '', regex=True)
         except Exception as e:
             logging.error(f"Error creating DataFrame: {e}")
-            self.coin_data = pd.DataFrame()
+            self.coin_data = pd.DataFrame(columns=['coin_name', 'coin_price', 'spider_web'])
         return self.coin_data
 
 

@@ -52,6 +52,7 @@ class SpiderByRequests(Spider):
             logger.exception(f'{self.url} 返回的内容不是 JSON 格式: {value_err}')
         except Exception as e:
             logger.exception(f'未知错误: {e}')
+        return self
 
     def parse(self):
         """从通过处理的json数据中拿到想要的数据，将币种和价格分别存在self.coins和self.prices中"""
@@ -63,11 +64,10 @@ class SpiderByRequests(Spider):
         except AttributeError as e:
             logger.exception(e)
 
-
         try:
             price = self.records[0].get(self.price_key)
             coin = self.records[0].get(self.name_key)
-            if price is None and coin is None:
+            if price is None or coin is None:
                 raise KeyNotFound(f'未找到期望的key: {self.price_key} 或 {self.name_key}')
         except IndexError:
             raise KeyNotFound(f'未找到期望的key: {self.name_key} 或 {self.price_key}')
@@ -85,7 +85,6 @@ class SpiderByRequests(Spider):
         if isinstance(price, str):
             price = price.replace('$', '').replace(',', '')
 
-
         if coin and price:
             self.coins.append(coin)
             self.prices.append(price)
@@ -93,7 +92,7 @@ class SpiderByRequests(Spider):
             raise SpiderFailedError('爬取失败')
 
 if __name__ == '__main__':
-    spider_web = SpiderWeb.COIN_STATS
+    spider_web = SpiderWeb.BINANCE
     spider = SpiderByRequests(spider_web)
     spider.get_content()
     # print(spider.res_json)

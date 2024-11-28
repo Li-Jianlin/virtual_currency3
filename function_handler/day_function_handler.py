@@ -19,7 +19,7 @@ class DayFunctionHandler(FunctionHandler):
         # 执行所有函数
         self.results = []
         for func in self.functions:
-            if not self.range_data_day.empty:
+            if not self.range_data_days.empty:
                 try:
                     res = func()
                     if res:
@@ -53,7 +53,7 @@ class DayFunctionHandler(FunctionHandler):
 
         third_day_ahead_datetime = self.datetime - timedelta(days=3)
         # 前四天数据
-        fourth_day_ahead_data = self.range_data_day[
+        fourth_day_ahead_data = self.range_data_days[
             ['coin_name', 'spider_web', 'change', 'time']]
         fourth_day_ahead_data = fourth_day_ahead_data[
             fourth_day_ahead_data['time'].between(fourth_day_ahead_datetime, self.datetime, inclusive='left')].copy()

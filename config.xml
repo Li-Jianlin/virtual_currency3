@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<root>
+    <function_handler>
+        <!--                价格比较时，两者的倍率-->
+        <filter_by_price_comparison>0.99</filter_by_price_comparison>
+    </function_handler>
+
+    <minute_function>
+        <minute_func_1_base>
+            <!--            A和B的最大时间间隔-->
+            <MAX_TIME_INTERVAL>24</MAX_TIME_INTERVAL>
+            <!--            A和B时刻的跌涨幅要<=AB_CHANGE-->
+            <AB_CHANGE>1</AB_CHANGE>
+            <!--            A和B的虚降要小于等于AB_VIRTUAL_DROP-->
+            <AB_VIRTUAL_DROP>1.1</AB_VIRTUAL_DROP>
+            <!--            C时刻价格要小于前C_PRE_TIME_INTERVAL小时的收盘价的最小值-->
+            <C_PRE_TIME_INTERVAL>2</C_PRE_TIME_INTERVAL>
+        </minute_func_1_base>
+        <apply_condition_1_to_func_1_base>
+            <!--            A和B的跌幅大于等于CHANGE%-->
+            <CHANGE>-0.7</CHANGE>
+            <!--            binance-->
+            <!--            A和B虚降大于跌幅的MAGANTIFICATION倍-->
+            <MAGNIFICATION_BINANCE>2</MAGNIFICATION_BINANCE>
+            <!--            A或者B前6小时内存在跌幅小于等于A_OR_B_CHANGE-->
+            <A_OR_B_CHANGE_BINANCE>-2.5</A_OR_B_CHANGE_BINANCE>
+            <!--            other-->
+            <!--            A和B虚降大于跌幅的MAGANTIFICATION倍-->
+            <MAGNIFICATION_OTHER>3.5</MAGNIFICATION_OTHER>
+            <!--            A或者B前6小时内存在跌幅小于等于A_OR_B_CHANGE-->
+            <A_OR_B_CHANGE_OTHER>-4</A_OR_B_CHANGE_OTHER>
+        </apply_condition_1_to_func_1_base>
+
+    </minute_function>
+    <hour_function>
+        <hour_func_1_base>
+            <!--            A和B最多间隔MAX_TIME_INTERVAL小时-->
+            <MAX_TIME_INTERVAL>24</MAX_TIME_INTERVAL>
+            <!--            A和B的跌涨幅要小于等于AB_CHANGE-->
+            <AB_CHANGE>1</AB_CHANGE>
+            <!--            A和B的虚降要大于等于AB_VIRTUAL_DROP-->
+            <AB_VIRTUAL_DROP>1.1</AB_VIRTUAL_DROP>
+            <!--            C时刻的跌幅要小于C_CHANGE-->
+            <C_CHANGE>0</C_CHANGE>
+            <!--            C时刻价格要小于前C_PRE_TIME_INTERVAL小时的收盘价的最小值-->
+            <C_PRE_TIME_INTERVAL>2</C_PRE_TIME_INTERVAL>
+        </hour_func_1_base>
+        <apply_condition_1_to_func_1_base>
+            <!--            C收盘价小于等于A最低价和B最低价中最小值的CLOSE_PRICE_THRESHOLD倍-->
+            <CLOSE_PRICE_THRESHOLD>0.96</CLOSE_PRICE_THRESHOLD>
+        </apply_condition_1_to_func_1_base>
+        <apply_condition_2_to_func_1_base>
+            <!--            A和B的跌幅大于等于CHANGE-->
+            <CHANGE>-0.7</CHANGE>
+            <!--            binance-->
+            <!--            A和B的虚降大于跌幅的MAGANTIFICATION倍-->
+            <MAGNIFICATION_BINANCE>2</MAGNIFICATION_BINANCE>
+            <!--            A或者B前6小时内存在跌幅小于等于A_OR_B_CHANGE-->
+            <A_OR_B_CHANGE_BINANCE>-2.5</A_OR_B_CHANGE_BINANCE>
+            <!--            other-->
+            <MAGNIFICATION_OTHER>3.5</MAGNIFICATION_OTHER>
+            <A_OR_B_CHANGE_OTHER>-4</A_OR_B_CHANGE_OTHER>
+        </apply_condition_2_to_func_1_base>
+    </hour_function>
+
+</root>

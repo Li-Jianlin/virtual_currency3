@@ -1,5 +1,7 @@
 import logging
 from datetime import datetime
+
+import pandas as pd
 from pandas import DataFrame
 from selenium.common import InvalidArgumentException, TimeoutException
 from socks import method
@@ -43,7 +45,7 @@ class DataGetter:
         elif self.method == 'selenium':
             self.spider = SpiderBySelenium(spider_web)
             logger.info("创建selenium驱动对象")
-            self.spider.get_headless_driver()
+            self.spider.get_driver()
             logger.info("加载页面")
             # 提前加载出页面
             try:
@@ -91,24 +93,26 @@ class DataGetter:
         """过滤数据"""
         if not self.spider.coin_data.empty:
             data = self.spider.coin_data
-            data = data[~data['coin_name'].isin(self.blacklist)].copy()
+            data = data[~data['coin_name'].isin(self.blacklist)]
+            # 去除所有以$符号开头的币种
+            data = data[~data['coin_name'].str.startswith('$')].copy()
             self.data = data
         else:
             logger.warning("数据为空")
+            self.data = DataFrame(columns=['coin_name', 'coin_price', 'spider_web'])
         return self
-
-
-
-
 
 
 
 if __name__ == '__main__':
 
-    data_getter = DataGetter(SpiderWeb.INVERSTING)
-    while True:
-        cur_time = datetime.now()
-        if cur_time.second == 0:
-            data_getter.get_data()
-            print(data_getter.data)
-
+    # data_getter = DataGetter(SpiderWeb.INVERSTING)
+    # while True:
+    #     cur_time = datetime.now()
+    #     if cur_time.second == 0:
+    #         data_getter.get_data()
+    #         print(data_getter.data)
+    data = pd.DataFrame({'coin_name':['BTC', 'ETH', '$USDT', 'ad', 'ahfoisa', 'ashfouas', '$ashofugasi'],
+                         'coin_price': ['123', '123', '123', '123', '123', '123', '123']})
+    data = data[~data['coin_name'].str.startswith('$')]
+    print(data)
