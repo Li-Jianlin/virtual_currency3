@@ -65,6 +65,7 @@ class SpiderWeb(Enum):
     INVERSTING = 'inversting'
     BINANCE = 'binance'
     COIN_STATS = 'coin-stats'
+    GATE = 'gate'
 
 
 configHandler = ConfigHandler(file_path=rf'{os.path.join(PROJECT_ROOT_PATH, 'config.xml')}')
@@ -72,22 +73,41 @@ configHandler.load_config()
 configHandler.start_monitoring(5)
 minute_function_config = configHandler.config.get('minute_function')
 hour_function_config = configHandler.config.get('hour_function')
-
-
+day_function_config = configHandler.config.get('day_function')
 
 CONFIG_JSON = {
     'coin-stats': {
         'url': 'https://api.coin-stats.com/v4/coins?skip=0&limit=900',
-        'coins_key': 'coins',
+        'request_method': 'get',
+        'coins_key': ['coins'],
         'price_key': 'pu',
         'name_key': 's'
+
     },
     'binance': {
         'url': 'https://www.binance.th/bapi/asset/v2/public/asset-service/product/get-products?includeEtf=true',
-        'coins_key': 'data',
+        'request_method': 'get',
+        'coins_key': ['data'],
         'price_key': 'c',
         'name_key': 'b'
+    },
+    'gate': {
+        'url': "https://www.gate.io/api-price/api/inner/v2/price/getAllCoinList",
+        'request_method': 'post',
+        'total_nums': 1600,
+        'pageSize': 20,
+        'data': {
+            "is_gate": 1000001,
+            "tab": "trade",
+            "page": 1,
+            "pageSize": 20
+        },
+        'coins_key': ['data', 'list'],
+        'name_key': "coin_short_name",
+        'price_key': "price"
+
     }
+
 }
 
 CONFIG_JSON_SELENIUM = {
@@ -108,7 +128,7 @@ CONFIG_JSON_SELENIUM = {
     'inversting': {
         'url': 'https://cn.investing.com/crypto/currencies',
         'method': 'click',
-        'num_of_click': 8,
+        'num_of_click': 13,
         'more_msg_button_css': "div[class='flex h-full cursor-pointer items-center justify-center text-inv-blue-500']  span[class='mr-2'",
         'coin_name_xpath': '//tbody/tr/td[4]/div[2]/span[2]',
         'coin_price_xpath': '//tbody/tr/td[5]'
@@ -147,14 +167,15 @@ hour_function_description = {
                          f'A时刻与C时刻不超过{hour_function_config.get("hour_func_1_base").get("MAX_TIME_INTERVAL")}小时。'
                          f'A时刻在B时刻之前，A和B时刻均要满足虚降>={hour_function_config.get("hour_func_1_base").get("AB_VIRTUAL_DROP")}%,'
                          f'且跌涨幅<={hour_function_config.get("hour_func_1_base").get("AB_CHANGE")}%;'
-                         'A时刻收盘价的0.99倍大于B时刻收盘价。;C时刻收盘价同时小于A的最低价和B的最低价。'
+                         'A时刻收盘价的0.99倍大于B时刻收盘价。;'
+                         'C时刻收盘价同时小于A的最低价和B的最低价。'
                          f'C价格小于前{hour_function_config.get("hour_func_1_base").get("C_PRE_TIME_INTERVAL")}小时最低价的最小值'),
     'apply_condition_1_to_func_1_base': ('有ABC三个时刻。其中C为当前时刻C时刻在跌;'
                                          f'A时刻与C时刻不超过{hour_function_config.get("hour_func_1_base").get("MAX_TIME_INTERVAL")}小时。'
                                          f'A时刻在B时刻之前，A和B时刻均要满足虚降>={hour_function_config.get("hour_func_1_base").get("AB_VIRTUAL_DROP")}%,'
                                          f'且跌涨幅<={hour_function_config.get("hour_func_1_base").get("AB_CHANGE")}%;'
                                          f'A时刻收盘价的0.99倍大于B时刻收盘价。C时刻收盘价同时小于A的最低价和B的最低价.'
-                                         f'C价格小于前{hour_function_config.get("hour_func_1_base").get("C_PRE_TIME_INTERVAL")}小时最低价的最小值;'
+                                         f'C开盘价小于等于前{hour_function_config.get("hour_func_1_base").get("C_PRE_TIME_INTERVAL")}小时所有开盘价和收盘价的最小值;'
                                          f'C收盘价小于等于A最低价和B最低价中最小值的'
                                          f'{hour_function_config.get("apply_condition_1_to_func_1_base").get("CLOSE_PRICE_THRESHOLD")}倍'),
     'apply_condition_2_to_func_1_base': ('有ABC三个时刻。其中C为当前时刻;'
@@ -162,13 +183,15 @@ hour_function_description = {
                                          f'A时刻在B时刻之前，A和B时刻均要满足虚降>={hour_function_config.get("hour_func_1_base").get("AB_VIRTUAL_DROP")}%,'
                                          f'且跌涨幅<={hour_function_config.get("hour_func_1_base").get("AB_CHANGE")}%;'
                                          f'A时刻收盘价的0.99倍大于B时刻收盘价。C时刻价格同时小于A的最低价和B的最低价.'
-                                         f'C价格小于前{hour_function_config.get("hour_func_1_base").get("C_PRE_TIME_INTERVAL")}小时最低价的最小值;'
+                                         f'C开盘价小于等于前{hour_function_config.get("hour_func_1_base").get("C_PRE_TIME_INTERVAL")}小时所有开盘价和收盘价的最小值;'
                                          f'A或者B其中一个至少满足：虚降>=跌幅的{hour_function_config.get("apply_condition_2_to_func_1_base").get("MAGNIFICATION_BINANCE")}(binance)/'
                                          f'{hour_function_config.get("apply_condition_2_to_func_1_base").get("MAGNIFICATION_OTHER")}(other)倍，'
                                          f'并且跌幅小于等于{hour_function_config.get("apply_condition_2_to_func_1_base").get("CHANGE")}.'
                                          f'或者满足条件：A或者B前6小时存在跌幅<={hour_function_config.get("apply_condition_2_to_func_1_base").get("A_OR_B_CHANGE_BINANCE")}(binance)/'
                                          f'{hour_function_config.get("apply_condition_2_to_func_1_base").get("A_OR_B_CHANGE_OTHER")}(other),'
-                                         f'且该时刻的开盘价大于等于A或者B的max(开盘价, 收盘价)')
+                                         f'且该时刻的开盘价大于等于A或者B的max(开盘价, 收盘价),'
+                                         f'当前时刻相较于国际0点，跌涨幅<={hour_function_config.get("apply_condition_2_to_func_1_base").get("CHANGE_ON_INTERNATIONAL_TIME_BINANCE")}%(binance)/{hour_function_config.get("apply_condition_2_to_func_1_base").get("CHANGE_ON_INTERNATIONAL_TIME_OTHER")}%(other)'),
+    'add_filte_in_minute_and_hour': '=========23小时5次限制========='
 }
 
 minute_function_description = {
@@ -177,19 +200,58 @@ minute_function_description = {
                            f'A时刻在B时刻之前，A和B时刻均要满足虚降>={minute_function_config.get("minute_func_1_base").get("AB_VIRTUAL_DROP")}%,'
                            f'且跌涨幅<={minute_function_config.get("minute_func_1_base").get("AB_CHANGE")}%;'
                            f'A时刻收盘价的0.99倍大于B时刻收盘价。C时刻价格同时小于A的最低价和B的最低价.'
-                           f'C价格小于前{minute_function_config.get("minute_func_1_base").get("C_PRE_TIME_INTERVAL")}小时最低价的最小值;'
+                           f'C价格小于前{minute_function_config.get("minute_func_1_base").get("C_PRE_TIME_INTERVAL")}小时所有开盘和收盘价的最小值;'
                            f'后两次价格低于第一次价格'),
     'apply_condition_1_to_func_1_base': ('有ABC三个时刻。其中C为当前时刻;'
                                          f'A时刻与C时刻不超过{minute_function_config.get("minute_func_1_base").get("MAX_TIME_INTERVAL")}小时。'
                                          f'A时刻在B时刻之前，A和B时刻均要满足虚降>={minute_function_config.get("minute_func_1_base").get("AB_VIRTUAL_DROP")}%,'
                                          f'且跌涨幅<={minute_function_config.get("minute_func_1_base").get("AB_CHANGE")}%;'
                                          f'A时刻收盘价的0.99倍大于B时刻收盘价。C时刻价格同时小于A的最低价和B的最低价.'
-                                         f'C价格小于前{minute_function_config.get("minute_func_1_base").get("C_PRE_TIME_INTERVAL")}小时最低价的最小值;'
+                                         f'C价格小于等于前{minute_function_config.get("minute_func_1_base").get("C_PRE_TIME_INTERVAL")}小时所有开盘和收盘价的最小值;'
                                          f'后两次价格低于第一次价格\n'
                                          f'A或者B其中一个至少满足：虚降>=跌幅的{minute_function_config.get("apply_condition_1_to_func_1_base").get("MAGNIFICATION_BINANCE")}(binance)/'
                                          f'{minute_function_config.get("apply_condition_1_to_func_1_base").get("MAGNIFICATION_OTHER")}(other)倍，'
                                          f'并且跌幅小于等于{minute_function_config.get("apply_condition_1_to_func_1_base").get("CHANGE")}.'
                                          f'或者满足条件：A或者B前6小时存在跌幅<={minute_function_config.get("apply_condition_1_to_func_1_base").get("A_OR_B_CHANGE_BINANCE")}(binance)/'
                                          f'{minute_function_config.get("apply_condition_1_to_func_1_base").get("A_OR_B_CHANGE_OTHER")}(other),'
-                                         f'且该时刻的开盘价大于等于A或者B的max(开盘价, 收盘价)')
+                                         f'且该时刻的开盘价大于等于A或者B的max(开盘价, 收盘价),'
+                                         f'每一次异常时，价格均低于上一次的0.99倍'
+                                         f'当前时刻相较于国际0点的跌涨幅<={minute_function_config.get("apply_condition_1_to_func_1_base").get("CHANGE_ON_INTERNATIONAL_TIME_BINANCE")}%(binance)/'
+                                         f'{minute_function_config.get("apply_condition_1_to_func_1_base").get("CHANGE_ON_INTERNATIONAL_TIME_OTHER")}%(other)'),
+    'add_filte_in_minute_and_hour': '=========23小时5次限制========='
 }
+
+day_function_description = {
+    'func_1': (
+
+        f"1.C为当前时刻，A与C时刻不超过{day_function_config.get('func_1').get('MAX_TIME_INTERVAL')}天"
+        f'2.A时刻在B时刻之前'
+        f'3.C时刻开盘价小于最近两天的所有开盘和收盘价的最小值'
+        f'4.C时刻开盘价小于A的最低价和B的最低价'
+        f"5.AB均为跌且虚降大于等于{day_function_config.get('func_1').get('AB_VIRTUAL_DROP')}%"
+        f"6.（1）A或者B虚降大于{day_function_config.get('func_1').get('filter_by_AB_before_6_days').get('MAGNIFICATION')}倍跌幅，且跌幅 <="
+        f"{day_function_config.get('func_1').get('filter_by_AB_before_6_days').get('AB_CHANGE')}%"
+        f"（2）A或者B前6天存在跌幅 < {day_function_config.get('func_1').get('filter_by_AB_before_6_days').get('BEFORE_CHANGE')}% 的时刻，且该时刻的开盘价大于等于A或者B时刻`max(收盘价, 开盘价)`"
+        f'条件6满足其中一个即可'
+        f'7.A时刻收盘价的0.99大于B时刻收盘价'
+        f"8.某一个B时刻后面存在一个低于B时刻`最低价*(虚降 * {day_function_config.get('func_1').get('AFTER_B_VIRTUAL_DROP_MAGNIFICATION')} + 1)`的时刻，"
+        f"然后再有高于此B时刻`最低价*(虚降 * {day_function_config.get('func_1').get('AFTER_B_VIRTUAL_DROP_MAGNIFICATION')} + 1)`的时刻，则该B废弃不用。"
+    ),
+    'func_2': (f'1.C为当前时刻，A与C时刻不超过45天'
+               f'2.A时刻在B时刻之前'
+               f'3.C时刻min(开盘价, 收盘价)同时小于最近两天收盘价的最小值'
+               f'4.C时刻开盘价小于A的最低价和B的最低价'
+               f'5.AB均为跌且虚降大于等于5%，跌幅<=-4%;'
+               f'6.（1）A或者B虚降大于1.5倍跌幅，'
+               f' （2）A或者B前6天存在跌幅 < -10% 的时刻，且该时刻的开盘价大于等于A或者B时刻max(收盘价, 开盘价)'
+               f'条件6满足其中一个即可'
+               f'7.A时刻收盘价的0.95大于B时刻收盘价'
+               f'8.B时刻的失效问题，暂时不管；'
+               f'针对非必安的其他股票：'
+               f'（1）A或者B虚降大于1.6倍跌幅，且跌幅 <= -5%，'
+               f'（2）A或者B前6天存在跌幅 < -10% 的时刻，且该时刻的开盘价大于等于A或者B时刻max(收盘价, 开盘价)'
+               )
+}
+
+# pprint(hour_function_description)
+# pprint(minute_function_description)

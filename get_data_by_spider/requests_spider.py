@@ -27,18 +27,18 @@ class SpiderByRequests(Spider):
         self.coins_key = self.web_info.get('coins_key')
         self.price_key = self.web_info.get('price_key')
         self.name_key = self.web_info.get('name_key')
+        self.request_method = self.web_info.get('request_method')
 
-
-    def get_content(self, request_mode='get', **kwargs):
+    def get_content(self, **kwargs):
         """获取网页内容，将内容解析为json格式存储在变量self.res_json中"""
         try:
-            if request_mode == 'get':
+            if self.request_method == 'get':
                 responses = requests.get(self.url, headers=self.headers, timeout=10)
-            elif request_mode == 'post':
+            elif self.request_method == 'post':
                 data = kwargs.get('data')
                 responses = requests.post(self.url, headers=self.headers, data=data, timeout=10)
             else:
-                raise ValueError(f'不支持的请求模式 {request_mode}: 必须为 "get" 或 "post"')
+                raise ValueError(f'不支持的请求模式 {self.request_method}: 必须为 "get" 或 "post"')
 
             # 检查响应状态码
             responses.raise_for_status()  # 如果响应代码不是200-299, 抛出HTTPError异常
@@ -58,7 +58,8 @@ class SpiderByRequests(Spider):
         """从通过处理的json数据中拿到想要的数据，将币种和价格分别存在self.coins和self.prices中"""
         # 检验能否正常取出数据
         try:
-            self.records = self.res_json.get(self.coins_key)
+            for key in self.coins_key:
+                self.records = self.res_json.get(key)
         except KeyError:
             raise KeyNotFound(f'未找到期望的key: {self.coins_key}')
         except AttributeError as e:
@@ -74,6 +75,11 @@ class SpiderByRequests(Spider):
         except Exception as e:
             logger.exception(e)
             return
+
+        # 如果是binance的数据，需要过滤掉其他单位的数据，只保留单位为USDT的数据
+        if self.spider_web == SpiderWeb.BINANCE.value:
+            self.filte_binance_data_unit_USDT()
+
         # 遍历记录，提取并处理币种和价格数据
         for record in self.records:
             self.process_record(record)
@@ -91,9 +97,18 @@ class SpiderByRequests(Spider):
         else:
             raise SpiderFailedError('爬取失败')
 
+    def filte_binance_data_unit_USDT(self):
+        records = []
+        for record in self.records:
+            if record['q'] == 'USDT':
+                records.append(record)
+        self.records = records
+
+
 if __name__ == '__main__':
-    spider_web = SpiderWeb.BINANCE
+    spider_web = SpiderWeb.GATE
     spider = SpiderByRequests(spider_web)
+    data = CONFIG_JSON.get('gate').get('data')
     spider.get_content()
     # print(spider.res_json)
     spider.parse()

@@ -9,6 +9,7 @@ from decimal import Decimal
 from xml.etree import ElementTree
 import collections
 
+
 base_folder = os.path.join(os.path.dirname(__file__), "log")
 if not os.path.exists(base_folder):
     os.makedirs(base_folder, exist_ok=True)
@@ -16,12 +17,14 @@ if not os.path.exists(base_folder):
 from get_data_by_spider.get_data import DataGetter
 from dataio.csv_handler import CSVReader, CSVWriter, make_sure_path_exists
 from data_process.data_process import DataProcess
-from config import SpiderWeb, hour_function_description, minute_function_description, ConfigHandler
+from config import SpiderWeb, hour_function_description, minute_function_description, ConfigHandler, day_function_description
 from msg_log.mylog import get_logger
 from function_handler.minute_function_handler import MinuteFunctionHandler
 from function_handler.hour_function_handler import HourlyFunctionHandler
 from function_handler.day_function_handler import DayFunctionHandler
 from msg_log.msg_send import send_email
+from function_handler.new_hour_function_handler import NewHourFunctionHandler
+from function_handler.new_minute_function_handler import NewMinuteFunctionHandler
 
 PROJECT_ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 logger = get_logger(
@@ -58,7 +61,7 @@ class ProgramCotroller:
         # 爬虫
         logger.info("初始化数据爬取器")
         self.binance_data_getter = DataGetter(SpiderWeb.BINANCE)
-        # self.inversting_data_getter = DataGetter(SpiderWeb.INVERSTING)
+        self.inversting_data_getter = DataGetter(SpiderWeb.INVERSTING)
         self.coin_stats_data_getter = DataGetter(SpiderWeb.COIN_STATS)
         self.lock = Lock()
         logger.info("初始化数据处理器")
@@ -116,7 +119,7 @@ class ProgramCotroller:
         self.res = []
 
         for cur_getter in (
-                # self.inversting_data_getter,
+                self.inversting_data_getter,
                 self.binance_data_getter,
                 self.coin_stats_data_getter
         ):
@@ -238,13 +241,28 @@ class ProgramCotroller:
             datetime=self.cur_datetime,
             config=self.config_handler.config.get('hour_function')
         )
+        self.new_hour_functionhandler = NewHourFunctionHandler(
+            data=None,
+            reader=self.reader,
+            writer=self.writer,
+            datetime=self.cur_datetime,
+            config=self.config_handler.config.get('hour_function')
+        )
         self.dayfunctionhandler = DayFunctionHandler(
             data=None,
             reader=self.reader,
             writer=self.writer,
-            datetime=self.cur_datetime
+            datetime=self.cur_datetime,
+            config=self.config_handler.config.get('day_function')
         )
         self.minutefunctionhandler = MinuteFunctionHandler(
+            data=None,
+            reader=self.reader,
+            writer=self.writer,
+            datetime=self.cur_datetime,
+            config=self.config_handler.config.get('minute_function')
+        )
+        self.new_minute_functionhandler = NewMinuteFunctionHandler(
             data=None,
             reader=self.reader,
             writer=self.writer,
@@ -257,21 +275,29 @@ class ProgramCotroller:
             self.hourfunctionhandler.add_function(
                 [self.hourfunctionhandler.hour_func_1_base,
                  self.hourfunctionhandler.apply_condition_1_to_func_1_base,
-                 self.hourfunctionhandler.apply_condition_2_to_func_1_base]
+                 self.hourfunctionhandler.apply_condition_2_to_func_1_base,
+                 self.hourfunctionhandler.add_filte_in_minute_and_hour]
+            )
+            self.new_hour_functionhandler.add_function(
+                [self.new_hour_functionhandler.func_1,
+                 self.new_hour_functionhandler.add_filte_in_minute_and_hour]
             )
 
         if unit_time == "day":
             self.dayfunctionhandler.add_function(
-                [self.dayfunctionhandler.continous_change_drop_func_1]
+                [self.dayfunctionhandler.func_1, self.dayfunctionhandler.func_2]
             )
 
         if unit_time == "minute":
             self.minutefunctionhandler.add_function(
                 [
                     self.minutefunctionhandler.minute_func_1_base,
-                    self.minutefunctionhandler.apply_condition_1_to_func_1_base
+                    self.minutefunctionhandler.apply_condition_1_to_func_1_base,
+                    self.minutefunctionhandler.add_filte_in_minute_and_hour
                 ]
             )
+            self.new_minute_functionhandler.add_function([self.new_minute_functionhandler.func_1,
+                                                          self.new_minute_functionhandler.add_filte_in_minute_and_hour])
 
     # 执行小时函数
     def execute_hour_function(self, cur_data):
@@ -289,19 +315,26 @@ class ProgramCotroller:
         )
         self.hourfunctionhandler.execute_all()
 
+        self.new_hour_functionhandler.data = cur_data
+        self.new_hour_functionhandler.price_comparison_results.clear()
+        self.new_hour_functionhandler.send_messages.clear()
+        self.new_hour_functionhandler.datetime = self.pre_hour_datetime
+        pre_24_hours_datetime = self.pre_hour_datetime - timedelta(hours=24)
+        self.new_hour_functionhandler.get_range_data_hours(
+            pre_24_hours_datetime, self.cur_datetime, inclusive="left"
+        )
+        self.new_hour_functionhandler.execute_all()
+
     # 执行日函数
     def execute_day_function(self, cur_data):
         self.dayfunctionhandler.data = cur_data
         self.dayfunctionhandler.datetime = self.pre_day_datetime
 
-        pre_four_days_datetime = self.pre_day_datetime - timedelta(days=4)
+        pre_four_days_datetime = self.pre_day_datetime - timedelta(days=24)
         self.dayfunctionhandler.get_range_data_days(
             pre_four_days_datetime, self.pre_day_datetime, inclusive="left"
         )
         self.dayfunctionhandler.execute_all()
-        if self.dayfunctionhandler.results:
-            res_str = "\n".join(self.dayfunctionhandler.results)
-            return res_str
 
     def execute_minute_function(self, cur_data):
         self.minutefunctionhandler.data = cur_data
@@ -314,7 +347,17 @@ class ProgramCotroller:
         )
         self.minutefunctionhandler.execute_all()
 
-    def result_record(self, unit_time: Literal["hour", "day", "minute"]):
+        self.new_minute_functionhandler.data = cur_data
+        self.new_minute_functionhandler.price_comparison_results.clear()
+        self.new_minute_functionhandler.send_messages.clear()
+        self.new_minute_functionhandler.datetime = self.cur_datetime
+        pre_24_hours_datetime = (self.cur_datetime - timedelta(hours=24)).replace(minute=0)
+        self.new_minute_functionhandler.get_range_data_hours(
+            pre_24_hours_datetime, self.cur_datetime, inclusive="left"
+        )
+        self.new_minute_functionhandler.execute_all()
+
+    def result_record(self, unit_time: Literal["hour", "day", "minute", "new_hour", "new_minute"]):
         make_sure_path_exists(RESULT_FOLDER_PATH)
 
         result_list = list()
@@ -326,11 +369,24 @@ class ProgramCotroller:
             function_result_file = os.path.join(RESULT_FOLDER_PATH, 'hour_function_result.csv')
             send_messages = self.hourfunctionhandler.send_messages
             func_description = hour_function_description
+        elif unit_time == 'new_hour':
+            function_result_file = os.path.join(RESULT_FOLDER_PATH, 'new_hour_function_result.csv')
+            send_messages = self.new_hour_functionhandler.send_messages
+            func_description = hour_function_description
 
         elif unit_time == 'minute':
             function_result_file = os.path.join(RESULT_FOLDER_PATH, 'minute_function_result.csv')
             send_messages = self.minutefunctionhandler.send_messages
             func_description = minute_function_description
+        elif unit_time == 'new_minute':
+            function_result_file = os.path.join(RESULT_FOLDER_PATH, 'new_minute_function_result.csv')
+            send_messages = self.new_minute_functionhandler.send_messages
+            func_description = minute_function_description
+
+        elif unit_time == 'day':
+            function_result_file = os.path.join(RESULT_FOLDER_PATH, 'day_function_result.csv')
+            send_messages = self.dayfunctionhandler.send_messages
+            func_description = day_function_description
 
         for key, value in send_messages.items():
             if not value.empty:
@@ -362,7 +418,7 @@ if __name__ == "__main__":
     controller.create_function_handler()
     controller.add_funtion_to_handler("minute")
     controller.add_funtion_to_handler("hour")
-    # controller.add_funtion_to_handler('day')
+    controller.add_funtion_to_handler('day')
     try:
         while True:
             cur_datetime = datetime.now().replace(microsecond=0)
@@ -377,21 +433,18 @@ if __name__ == "__main__":
                     logger.warning(f"爬取失败,终止后续操作")
                     continue
                 combined_data = pd.concat(controller.res, ignore_index=True)
-                print(combined_data)
                 if combined_data.empty:
                     logger.warning(f"当前数据为空,终止后续操作")
                     continue
 
                 logger.info("为数据增加time列")
                 combined_data = controller.add_time_column(combined_data)
-                print(combined_data)
                 # print(combined_data)
                 # 改变coin_price字段数据类型
                 combined_data = controller.reader.change_column_type_to_Decimal(combined_data, only_price=True)
                 # 生成国际数据
                 foreign_data = combined_data.copy()
                 foreign_data["time"] = controller.foreign_datetime
-                print(foreign_data)
                 # 国内整点(每小时)
                 if controller.cur_minute == 0:
                     # 计算
@@ -401,37 +454,42 @@ if __name__ == "__main__":
 
                     controller.execute_hour_function(calculated_data)
                     res_hour = controller.result_record("hour")
-                    if res_hour:
-                        send_email(subject="每小时函数结果-v1", content=res_hour, test=is_Test)
+                    new_res_hour = controller.result_record("new_hour")
+                    # if res_hour:
+                    #     send_email(subject="每小时函数结果-v1", content=res_hour, test=is_Test)
+                    # if new_res_hour:
+                    #     send_email(subject="(新)每小时函数结果-v2", content=new_res_hour, test=is_Test)
+
 
                 # 国内0点
-                if cur_datetime.hour == 1 and controller.cur_minute == 0:
+                if cur_datetime.hour == 0 and controller.cur_minute == 0:
                     calculated_data_day = controller.days_data_process(
                         combined_data.copy(), data_region="China"
                     )
                     controller.update_45_day_max_price(calculated_data_day.copy())
-                    res_day = controller.execute_day_function(calculated_data_day)
+                    controller.execute_day_function(calculated_data_day)
+                    res_day = controller.result_record('day')
                     if res_day:
                         send_email(subject="每天函数结果-v1", content=res_day, test=is_Test)
                 # 国际0点（国内8点）
-                if cur_datetime.hour == 9 and controller.cur_minute == 0:
+                if cur_datetime.hour == 8 and controller.cur_minute == 0:
                     calculated_data_day_foreign = controller.days_data_process(
                         foreign_data.copy(), data_region="Foreign"
                     )
-                    res_day_foreign = controller.execute_day_function(
+                    controller.execute_day_function(
                         calculated_data_day_foreign
                     )
+                    res_day_foreign = controller.result_record('day')
                     if res_day_foreign:
                         send_email(
                             subject="国际每天函数结果-v1",
                             content=res_day_foreign,
-                            test=is_Test,
+                            test=is_Test
                         )
 
                 # 不是整点
                 logger.info("写入详情数据")
                 controller.change_data_region("China")
-                print(combined_data)
                 controller.writer.write_detail_data(combined_data)
                 controller.change_data_region("Foreign")
                 controller.writer.is_check = False
@@ -440,8 +498,11 @@ if __name__ == "__main__":
                 controller.change_data_region("China")
                 controller.execute_minute_function(combined_data)
                 res_minute = controller.result_record("minute")
-                if res_minute:
-                    send_email(subject="分钟函数结果-v1", content=res_minute, test=is_Test)
+                new_res_minute = controller.result_record("new_minute")
+                # if res_minute:
+                #     send_email(subject="分钟函数结果-v1", content=res_minute, test=is_Test)
+                # if new_res_minute:
+                #     send_email(subject="(新)分钟函数结果-v2", content=new_res_minute, test=is_Test)
                 logger.info("执行完毕")
                 logging.shutdown()
     except KeyboardInterrupt:

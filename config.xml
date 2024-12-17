@@ -12,8 +12,8 @@
             <MAX_TIME_INTERVAL>24</MAX_TIME_INTERVAL>
             <!--            A和B时刻的跌涨幅要<=AB_CHANGE-->
             <AB_CHANGE>1</AB_CHANGE>
-            <!--            A和B的虚降要小于等于AB_VIRTUAL_DROP-->
-            <AB_VIRTUAL_DROP>1.1</AB_VIRTUAL_DROP>
+            <!--            A和B的虚降要大于等于AB_VIRTUAL_DROP-->
+            <AB_VIRTUAL_DROP>1</AB_VIRTUAL_DROP>
             <!--            C时刻价格要小于前C_PRE_TIME_INTERVAL小时的收盘价的最小值-->
             <C_PRE_TIME_INTERVAL>2</C_PRE_TIME_INTERVAL>
         </minute_func_1_base>
@@ -22,14 +22,19 @@
             <CHANGE>-0.7</CHANGE>
             <!--            binance-->
             <!--            A和B虚降大于跌幅的MAGANTIFICATION倍-->
-            <MAGNIFICATION_BINANCE>2</MAGNIFICATION_BINANCE>
+            <MAGNIFICATION_BINANCE>1.7</MAGNIFICATION_BINANCE>
             <!--            A或者B前6小时内存在跌幅小于等于A_OR_B_CHANGE-->
-            <A_OR_B_CHANGE_BINANCE>-2.5</A_OR_B_CHANGE_BINANCE>
+            <A_OR_B_CHANGE_BINANCE>-2</A_OR_B_CHANGE_BINANCE>
+            <!--            相较于国际时间，跌涨幅<=CHANGE_ON_INTERNATIONAL_TIME%-->
+            <CHANGE_ON_INTERNATIONAL_TIME_BINANCE>4</CHANGE_ON_INTERNATIONAL_TIME_BINANCE>
             <!--            other-->
             <!--            A和B虚降大于跌幅的MAGANTIFICATION倍-->
-            <MAGNIFICATION_OTHER>3.5</MAGNIFICATION_OTHER>
+            <MAGNIFICATION_OTHER>3</MAGNIFICATION_OTHER>
             <!--            A或者B前6小时内存在跌幅小于等于A_OR_B_CHANGE-->
-            <A_OR_B_CHANGE_OTHER>-4</A_OR_B_CHANGE_OTHER>
+            <A_OR_B_CHANGE_OTHER>-3.5</A_OR_B_CHANGE_OTHER>
+            <!--            相较于国际时间的跌涨幅-->
+            <CHANGE_ON_INTERNATIONAL_TIME_OTHER>-5</CHANGE_ON_INTERNATIONAL_TIME_OTHER>
+
         </apply_condition_1_to_func_1_base>
 
     </minute_function>
@@ -40,7 +45,7 @@
             <!--            A和B的跌涨幅要小于等于AB_CHANGE-->
             <AB_CHANGE>1</AB_CHANGE>
             <!--            A和B的虚降要大于等于AB_VIRTUAL_DROP-->
-            <AB_VIRTUAL_DROP>1.1</AB_VIRTUAL_DROP>
+            <AB_VIRTUAL_DROP>1</AB_VIRTUAL_DROP>
             <!--            C时刻的跌幅要小于C_CHANGE-->
             <C_CHANGE>0</C_CHANGE>
             <!--            C时刻价格要小于前C_PRE_TIME_INTERVAL小时的收盘价的最小值-->
@@ -55,13 +60,55 @@
             <CHANGE>-0.7</CHANGE>
             <!--            binance-->
             <!--            A和B的虚降大于跌幅的MAGANTIFICATION倍-->
-            <MAGNIFICATION_BINANCE>2</MAGNIFICATION_BINANCE>
+            <MAGNIFICATION_BINANCE>1.7</MAGNIFICATION_BINANCE>
             <!--            A或者B前6小时内存在跌幅小于等于A_OR_B_CHANGE-->
-            <A_OR_B_CHANGE_BINANCE>-2.5</A_OR_B_CHANGE_BINANCE>
+            <A_OR_B_CHANGE_BINANCE>-2</A_OR_B_CHANGE_BINANCE>
             <!--            other-->
-            <MAGNIFICATION_OTHER>3.5</MAGNIFICATION_OTHER>
-            <A_OR_B_CHANGE_OTHER>-4</A_OR_B_CHANGE_OTHER>
+            <MAGNIFICATION_OTHER>3</MAGNIFICATION_OTHER>
+            <A_OR_B_CHANGE_OTHER>-3.5</A_OR_B_CHANGE_OTHER>
+            <!--            相较于国际时间，跌涨幅<=CHANGE_ON_INTERNATIONAL_TIME%-->
+            <CHANGE_ON_INTERNATIONAL_TIME_BINANCE>4</CHANGE_ON_INTERNATIONAL_TIME_BINANCE>
+            <CHANGE_ON_INTERNATIONAL_TIME_OTHER>-5</CHANGE_ON_INTERNATIONAL_TIME_OTHER>
         </apply_condition_2_to_func_1_base>
     </hour_function>
+    <day_function>
+        <func_1>
+            <!--            A和B最多间隔MAX_TIME_INTERVAL小时-->
+            <MAX_TIME_INTERVAL>24</MAX_TIME_INTERVAL>
+            <!--            A和B的跌涨幅要小于等于AB_CHANGE-->
+            <AB_CHANGE>0</AB_CHANGE>
+            <!--            A和B的虚降要小于等于AB_VIRTUAL_DROP-->
+            <AB_VIRTUAL_DROP>5</AB_VIRTUAL_DROP>
+            <!--            C时刻价格要小于前C_PRE_TIME_INTERVAL小时的收盘价的最小值-->
+            <C_PRE_TIME_INTERVAL>2</C_PRE_TIME_INTERVAL>
+            <!--           某一个B时刻后面存在一个低于B时刻`最低价*(虚降 * 0.005 + 1)` -->
+            <AFTER_B_VIRTUAL_DROP_MAGNIFICATION>0.005</AFTER_B_VIRTUAL_DROP_MAGNIFICATION>
+            <filter_by_AB_before_6_days>
+                <!--            A或者B虚降大于 MAGNIFITION 倍跌幅，且跌幅小于等于 AB_CHANGE-->
+                <MAGNIFICATION>1.7</MAGNIFICATION>
+                <AB_CHANGE>-5</AB_CHANGE>
+                <!--            A或者B前6天窜在跌幅 <= BEFORE_CHANGE 的时刻-->
+                <BEFORE_CHANGE>-10</BEFORE_CHANGE>
+            </filter_by_AB_before_6_days>
+        </func_1>
+        <func_2>
+            <binance_filter_by_AB_before_6_days>
+                <!--            A或者B虚降大于 MAGNIFITION 倍跌幅，且跌幅小于等于 AB_CHANGE-->
+                <MAGNIFICATION>1.7</MAGNIFICATION>
+                <!--                <AB_CHANGE>-5</AB_CHANGE>-->
+                <!--            A或者B前6天窜在跌幅 <= BEFORE_CHANGE 的时刻-->
+                <BEFORE_CHANGE>-10</BEFORE_CHANGE>
+            </binance_filter_by_AB_before_6_days>
+            <other_filter_by_AB_before_6_days>
+                <!--            A或者B虚降大于 MAGNIFITION 倍跌幅，且跌幅小于等于 AB_CHANGE-->
+                <MAGNIFICATION>1.6</MAGNIFICATION>
+                <AB_CHANGE>-5</AB_CHANGE>
+                <!--            A或者B前6天窜在跌幅 <= BEFORE_CHANGE 的时刻-->
+                <BEFORE_CHANGE>-10</BEFORE_CHANGE>
+            </other_filter_by_AB_before_6_days>
+        </func_2>
+
+
+    </day_function>
 
 </root>

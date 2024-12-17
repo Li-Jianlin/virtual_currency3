@@ -45,6 +45,7 @@ class FunctionHandler:
     def get_range_data_days(self, start_datetime: datetime, end_datetime: datetime,
                             inclusive: Literal['both', 'neither', 'left', 'right'] = 'both'):
         self.range_data_days = self.csv_reader.get_data_between_days(start_datetime, end_datetime, inclusive)
+        return self.range_data_days
 
     @staticmethod
     def filter_by_column(data: pd.DataFrame, column: str, comparison: Literal['gt', 'lt', 'ge', 'le', 'eq', 'neq'],
@@ -229,9 +230,9 @@ class FunctionHandler:
         data.drop_duplicates(subset=['coin_name'], inplace=True, keep='first')
         # 四舍五入
         data['virtual_drop_A'] = data['virtual_drop_A'].apply(
-            FunctionHandler.round_decimal, decimals=3)
+            FunctionHandler.round_decimal, decimals=decimals)
         data['virtual_drop_B'] = data['virtual_drop_B'].apply(
-            FunctionHandler.round_decimal, decimals=3)
+            FunctionHandler.round_decimal, decimals=decimals)
         data = data[
             ['coin_name', 'spider_web', 'virtual_drop_A', 'virtual_drop_B', 'time_A', 'time_B', 'condition']].copy()
         # 简化时间
@@ -249,21 +250,21 @@ class FunctionHandler:
         # 对前n小时数据进行分组
         pre_three_hours_group_data = pre_three_hours_data.groupby(['coin_name', 'spider_web'])
 
-        # 找出每组最低价的最小值
-        min_low = pre_three_hours_group_data['low'].min()
+        # 找出每组收盘价和开盘价中的最小值
+        min_low = pre_three_hours_group_data[['close', 'open']].apply(lambda group: group.min().min())
 
         # 更改字段名
         min_low = min_low.rename('min_low')
 
         # 拼接
-        combined_data = cur_data.merge(min_low, left_on=['coin_name', 'spider_web'], right_index=True, how='inner')
+        combined_data = cur_data.merge(min_low, left_on=['coin_name', 'spider_web'], right_index=True,
+                                       how='inner').reset_index(drop=True)
 
         condition = None
         if unit_time == 'minute':
-            condition = combined_data['coin_price'] < combined_data['min_low']
+            condition = combined_data['coin_price'] <= combined_data['min_low']
         elif unit_time == 'hour':
-            min_price = combined_data[['open', 'close']].min(axis=1)
-            condition = min_price < combined_data['min_low']
+            condition = combined_data['open'] <= combined_data['min_low']
 
         filter_data = combined_data[condition]
         filter_data = filter_data.drop(columns=['min_low'])
@@ -274,7 +275,7 @@ class FunctionHandler:
                                                                  base_data: pd.DataFrame, total_data: pd.DataFrame,
                                                                  config: dict):
         """
-1.      1.虚降 >= 跌幅的MAGNIFICATION倍，跌幅<=CHANGE%
+        1.虚降 >= 跌幅的MAGNIFICATION倍，跌幅<=CHANGE%
         2. 在A之前6小时内存在或者在B之前6小时内存在跌幅<=A_OR_B_CHANGE%,且对应的前6小时开盘价大于等于A或者B时刻`max(收盘价, 开盘价)
         根据网站来决定
         :param config:
@@ -293,6 +294,7 @@ class FunctionHandler:
         MAGNIFICATION = Decimal(config[MAGNIFICATION_KEY])
         A_OR_B_CHANGE = Decimal(config[A_OR_B_CHANGE_KEY])
         CHANGE = Decimal(config[CHANGE_KEY])
+
         # condition_1
         condition_1 = ((base_data['change_A'] <= CHANGE) & (
                 base_data['virtual_drop_A'] > base_data['change_A'].abs() * MAGNIFICATION)) | (
@@ -366,7 +368,7 @@ class FunctionHandler:
         conform_condition_1_data = base_data[condition_1].copy()
         conform_condition_1_data['condition'] = f'change <={CHANGE}({spider_web})'
         # 满足条件2
-        conform_condition_2_data = base_data[base_data['condition_met']]
+        conform_condition_2_data = base_data[base_data['condition_met']].copy()
         conform_condition_2_data['condition'] = f'A或者B前6小时存在跌幅 <= {A_OR_B_CHANGE}%({spider_web})'
 
         conform_condition_1_and_2_data = pd.concat([conform_condition_1_data, conform_condition_2_data],
@@ -375,6 +377,120 @@ class FunctionHandler:
         conform_condition_1_and_2_data.drop(columns=['condition_met', 'time_window_A_start', 'time_window_B_start'],
                                             inplace=True)
         return conform_condition_1_and_2_data
+
+    def filter_by_international_change(self, spider_web: str, base_data: pd.DataFrame, total_data: pd.DataFrame,
+                                       config: dict):
+        """
+        binance数据：当前时刻相较于国际时间（国内8点）的跌涨幅 <= 4%
+
+	    其他网站数据：当前时刻相较于国际时间的跌涨幅 <=  -5%
+        :param spider_web:
+        :param base_data:
+        :param total_data:
+        :param config:
+        :return:
+        """
+        if spider_web == 'binance':
+            CHANGE_ON_INTERNATIONAL_TIME_KEY = 'CHANGE_ON_INTERNATIONAL_TIME_BINANCE'
+        else:
+            CHANGE_ON_INTERNATIONAL_TIME_KEY = 'CHANGE_ON_INTERNATIONAL_TIME_OTHER'
+        CHANGE_ON_INTERNATIONAL_TIME = Decimal(config[CHANGE_ON_INTERNATIONAL_TIME_KEY])
+        cur_datetime = self.datetime
+
+        # 大于当天8点则使用当天的8点
+        if cur_datetime >= cur_datetime.replace(hour=8, minute=0):
+            international_time = cur_datetime.replace(hour=8, minute=0)
+        else:
+            # 小于当天8点则使用前一天8点
+            international_time = cur_datetime.replace(hour=8, minute=0) - timedelta(days=1)
+
+        # 获取8八点数据
+        international_data = total_data[total_data['time'] == international_time].copy()
+        international_data = international_data[international_data['coin_price'] != 0]
+        # 计算跌涨幅
+        merged_data = base_data[['coin_name', 'spider_web', 'coin_price_C']].drop_duplicates().merge(
+            international_data[['coin_name', 'spider_web', 'coin_price']],
+            on=['coin_name', 'spider_web'], how='left', suffixes=('_close', '_open'))
+        merged_data['change'] = (merged_data['coin_price_C'] - merged_data['coin_price']) / merged_data[
+            'coin_price'] * Decimal(100)
+
+        conform_condition_data = merged_data[merged_data['change'] <= CHANGE_ON_INTERNATIONAL_TIME].copy()
+        return conform_condition_data
+
+    def filter_by_hour_and_minute(self, cur_data: pd.DataFrame, unit_time: str, file_path: str):
+        """
+        1.以分钟为单位的函数：每一个时刻的C价格 <= 上一个C时刻价格的99%
+        2.以小时为单位的函数：每一个时刻的C价格 <= 上一个C时刻价格的99%
+
+        表中同一个AB时刻的同一币种出现次数最大为5次。
+        对于一个币种，记录的时间跨度最多为23小时。超过23小时则删除该条件记录。
+        columns = coin_name spider_web time_A time_B lasted_price_C_minute lasted_price_C_hour first_record_time  cnt
+        :return:
+        """
+
+
+        if unit_time == 'hour':
+            price_column = 'lasted_price_C_hour'
+        else:
+            price_column = 'lasted_price_C_minute'
+
+        # 读取文件
+        try:
+            record_data = pd.read_csv(file_path, encoding='utf-8', low_memory=False)
+        except FileNotFoundError:
+            record_data = pd.DataFrame(
+                columns=['coin_name', 'spider_web', 'time_A', 'time_B', 'lasted_price_C_minute', 'lasted_price_C_hour',
+                         'first_record_time', 'cnt'])
+
+        record_data['first_record_time'] = pd.to_datetime(record_data['first_record_time'])
+        record_data['time_A'] = pd.to_datetime(record_data['time_A'])
+        record_data['time_B'] = pd.to_datetime(record_data['time_B'])
+        record_data['lasted_price_C_minute'] = record_data['lasted_price_C_minute'].apply(Decimal)
+        record_data['lasted_price_C_hour'] = record_data['lasted_price_C_hour'].apply(Decimal)
+        # 过滤掉时间超出23小时的数据
+        pre_datetime = self.datetime - timedelta(hours=23)
+        record_data = record_data[record_data['first_record_time'] >= pre_datetime].copy()
+
+        # 分批处理
+        merged_data = record_data.merge(cur_data, on=['coin_name', 'spider_web', 'time_A', 'time_B'],
+                                        how='outer')
+        merged_data[price_column] = merged_data[price_column].fillna(merged_data['coin_price_C'])
+
+        # 只存在于数据:cnt为空
+        only_exist_data = merged_data[merged_data['cnt'].isna()].copy()
+        only_exist_data['cnt'] = only_exist_data['cnt'].fillna(1)
+        only_exist_data['first_record_time'] = self.datetime
+        # 只存在于文件: coin_price_C为空
+        only_exist_file = merged_data[merged_data['coin_price_C'].isna()].copy()  # 不做处理
+
+        # 共同存在于数据和文件: cnt和 coin_price_C均不为空
+        both_exits_file_and_data = merged_data[~merged_data['cnt'].isna() & ~merged_data['coin_price_C'].isna()].copy()
+        both_exits_file_and_data['condition_met'] = both_exits_file_and_data['coin_price_C'] <= \
+                                                    both_exits_file_and_data[price_column] * Decimal('0.995')
+        both_exits_file_and_data['cnt'] = both_exits_file_and_data.apply(
+            lambda x: x['cnt'] + 1 if x['condition_met'] else x['cnt'], axis=1)
+        both_exits_file_and_data[price_column] = both_exits_file_and_data.apply(
+            lambda x: x['coin_price_C'] if x['condition_met'] else x[price_column], axis=1)
+
+        # 合并当前时刻异常的数据
+        both_exits_abnormal_data = both_exits_file_and_data[both_exits_file_and_data['condition_met'] == True].copy()
+        both_exits_file_and_data.drop(columns=['condition_met'], inplace=True)
+        both_exits_abnormal_data.drop(columns=['condition_met'], inplace=True)
+        cur_abnormal_data = pd.concat([only_exist_data, both_exits_abnormal_data], ignore_index=True)
+        # 找出cnt小于等于5的数据
+        group_by_coin_data = cur_abnormal_data[['coin_name', 'cnt']].groupby('coin_name').sum().reset_index(drop=False)
+        coin_names = group_by_coin_data[group_by_coin_data['cnt'] <= 5]['coin_name'].values
+
+        abnormal_data = cur_abnormal_data[cur_abnormal_data['coin_name'].isin(coin_names)].copy()
+        # 写回文件的数据
+        write_to_file = pd.concat([only_exist_file, both_exits_file_and_data, only_exist_data], ignore_index=True)
+        write_to_file = write_to_file[
+            ['coin_name', 'spider_web', 'time_A', 'time_B', 'lasted_price_C_minute', 'lasted_price_C_hour',
+             'first_record_time', 'cnt']].copy()
+        write_to_file.to_csv(file_path, mode='w', index=False, encoding='utf-8', header=True)
+
+        abnormal_data = self.round_and_simple_data(abnormal_data, 2)
+        return abnormal_data.copy()
 
     def add_function(self, funcs: list):
         # 添加以小时为单位的函数
@@ -406,5 +522,5 @@ if __name__ == "__main__":
     range_data = FunctionHandler.filter_by_datetime(range_data, end_time, start_time, inclusive='left')
     # range_data = range_data.rename(columns={'time': 'time_B', 'low':'low_B'})
 
-    res = FunctionHandler.filter_C_by_price_lt_pre_hours_low_price(data, range_data)
+    res = FunctionHandler.filter_C_by_price_lt_pre_hours_low_price(data, range_data, 'hour')
     pass

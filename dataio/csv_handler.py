@@ -102,7 +102,7 @@ class CSVReader:
 
     def get_detail_data(self, cur_datetime):
         """获取前一个小时的所有详细数据"""
-        detail_data_path = os.path.join(self.base_file_path, f'detail_data_{cur_datetime.year}-{cur_datetime.month}-{cur_datetime.day}-{cur_datetime.hour}.csv')
+        detail_data_path = os.path.join(self.base_file_path, f'detail_data.csv')
         try:
             detail_data = pd.read_csv(detail_data_path, low_memory=False, encoding='utf-8', dtype='str')
             detail_data.dropna(inplace=True)
@@ -171,13 +171,13 @@ class CSVReader:
         for file_path in file_path_list:
             try:
                 target_data = pd.read_csv(file_path, low_memory=False, encoding='utf-8', dtype='str')
+                target_data.drop_duplicates(subset=['coin_name', 'spider_web', 'time'], inplace=True)
                 target_data.dropna(inplace=True)
             except FileNotFoundError:
                 continue
             else:
                 combined_data = pd.concat([combined_data, target_data], ignore_index=True)
         if not combined_data.empty:
-            combined_data.dropna(inplace=True)
             combined_data['time'] = pd.to_datetime(combined_data['time'])
             combined_data = combined_data[
                 combined_data['time'].between(start_datetime, end_datetime, inclusive=inclusive)]
@@ -235,7 +235,7 @@ class CSVWriter:
         cur_datetime = data.iloc[0]['time']
         target_file_folder = self.base_file_path
         make_sure_path_exists(target_file_folder)
-        target_file_name = f'detail_data_{cur_datetime.year}-{cur_datetime.month}-{cur_datetime.day}-{cur_datetime.hour}.csv'
+        target_file_name = f'detail_data.csv'
         target_file_path = os.path.join(target_file_folder, target_file_name)
 
         # 中途程序断开后，重新启动时需要判断文件中的数据是否为当前时刻的详细数据

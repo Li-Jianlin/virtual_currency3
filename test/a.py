@@ -92,13 +92,27 @@ if __name__ == "__main__":
     # pass
     # comparison_matrix = np.tril(np.ones((4, 4), dtype=bool), k=-1)
     # print(comparison_matrix)
-    data = {
-        'coin_name': ['BTC', 'ETH', 'USDT'],
-        'coin_price': ['0', '678.90', '12.34'],
-        'spider_web': ['binance', 'binance', 'binance'],
-        'time': ['2024-11-04 01:00:00', '2024-11-04 01:00:00', '2024-11-04 01:00:00']
-    }
-    data = pd.DataFrame(data)
-    data = CSVReader.change_column_type_to_Decimal(data, True)
-    eq_0 = data[data['coin_price'] != 0]
-    print(eq_0)
+    # data = {
+    #     'coin_name': ['BTC', 'ETH', 'USDT'],
+    #     'coin_price': ['0', '678.90', '12.34'],
+    #     'spider_web': ['binance', 'binance', 'binance'],
+    #     'time': ['2024-11-04 01:00:00', '2024-11-04 01:00:00', '2024-11-04 01:00:00']
+    # }
+    # data = pd.DataFrame(data)
+    # data = pd.DataFrame(columns=data.columns)
+    # print(data)
+    # # data = CSVReader.change_column_type_to_Decimal(data, True)
+    # # eq_0 = data[data['coin_price'] != 0]
+    # # 计数
+    # time_count = data['time'].drop_duplicates().count()
+    # print(time_count)
+    # # print(eq_0)
+    import time
+    a = "欢迎高育良莅临宜宾指导工作"
+    while True:
+        a = a[1:] + a[0]
+        print(a)
+        # 清空控制台
+        os.system('cls')
+        time.sleep(0.1)
+

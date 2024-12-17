@@ -1,4 +1,5 @@
 import logging
+import math
 from datetime import datetime
 
 import pandas as pd
@@ -10,7 +11,7 @@ from get_data_by_spider.requests_spider import SpiderByRequests
 from get_data_by_spider.selenium_spider import SpiderBySelenium
 from msg_log.mylog import get_logger
 from error_exception.customerror import KeyNotFound, SpiderFailedError
-from config import BLACKLIST_FILEPATH, SpiderWeb
+from config import BLACKLIST_FILEPATH, CONFIG_JSON, SpiderWeb
 PROJECT_ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 设置日志
 logger = get_logger(__name__, filename=os.path.join(PROJECT_ROOT_PATH, 'log', f'get_data.log'))
@@ -34,7 +35,8 @@ class DataGetter:
         SpiderWeb.COIN_STATS: 'requests',
         SpiderWeb.INVERSTING: 'selenium',
         SpiderWeb.COIN_GLASS: 'selenium',
-        SpiderWeb._528_btc: 'selenium'
+        SpiderWeb._528_btc: 'selenium',
+        SpiderWeb.GATE: 'requests'
     }
     def __init__(self, spider_web: SpiderWeb, **kwargs):
         self.method = self.spider_method.get(spider_web)
@@ -86,11 +88,23 @@ class DataGetter:
 
     def get_data_by_requests(self):
         """通过requests获取数据"""
-        self.spider.get_content()
-        self.spider.parse()
+        cnt = 1
+        if self.spider_web_name == 'gate':
+            data = CONFIG_JSON.get('gate').get('data')
+            total_nums = CONFIG_JSON.get('gate').get('total_nums')
+            pagesize = CONFIG_JSON.get('gate').get('pageSize')
+            cnt = math.ceil(total_nums / pagesize)
+        for page in range(cnt):
+            try:
+                data.update({'page': page})
+            except Exception as e:
+                data = dict()
+            self.spider.get_content(data=data)
+            self.spider.parse()
 
     def filter_data(self):
         """过滤数据"""
+        self.blacklist = read_blacklist(BLACKLIST_FILEPATH)
         if not self.spider.coin_data.empty:
             data = self.spider.coin_data
             data = data[~data['coin_name'].isin(self.blacklist)]
@@ -112,7 +126,12 @@ if __name__ == '__main__':
     #     if cur_time.second == 0:
     #         data_getter.get_data()
     #         print(data_getter.data)
-    data = pd.DataFrame({'coin_name':['BTC', 'ETH', '$USDT', 'ad', 'ahfoisa', 'ashfouas', '$ashofugasi'],
-                         'coin_price': ['123', '123', '123', '123', '123', '123', '123']})
-    data = data[~data['coin_name'].str.startswith('$')]
-    print(data)
+    data = pd.DataFrame({
+        'coin_name': ['ETH', 'BTC', 'USDT', 'PIN', 'CULT'],
+        'coin_price': [100, 200, 300, 400, 500]
+    })
+    blacklist = read_blacklist(BLACKLIST_FILEPATH)
+    print(blacklist)
+    print(len(blacklist))
+    filter_data = data[~data['coin_name'].isin(blacklist)]
+    print(filter_data)

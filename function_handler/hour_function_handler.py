@@ -3,7 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 import pandas as pd
 from datetime import timedelta, datetime
 from collections import Counter
-
+from msg_log.msg_send import send_email
 from config import ConfigHandler
 from function_handler.functionhandler import FunctionHandler
 from msg_log.mylog import get_logger
@@ -80,7 +80,6 @@ class HourlyFunctionHandler(FunctionHandler):
 
         recorded_data = recorded_data[['coin_name', 'spider_web', 'time_C', 'virtual_drop_A', 'virtual_drop_B']]
 
-
         try:
             record_data = pd.read_csv(record_file_path, encoding='utf-8', low_memory=False)
         except FileNotFoundError:
@@ -90,7 +89,6 @@ class HourlyFunctionHandler(FunctionHandler):
         # 拼接
         merged_data = record_data.merge(recorded_data, on=['coin_name', 'spider_web'], how='outer',
                                         suffixes=('', '_now'))
-
 
         # 文件与当前数据均存在对应数据, 此时没有缺失值;
         no_missing_data = merged_data.dropna(subset=['frequency', 'virtual_drop_A'], how='any')
@@ -112,13 +110,14 @@ class HourlyFunctionHandler(FunctionHandler):
         current_data = pd.concat([no_missing_data, missing_frequency_data], ignore_index=True)
 
         # 写回文件的数据
-        total_data = pd.concat([current_data, missing_virtual_drop_data], ignore_index=True).dropna(how='any').drop_duplicates()
+        total_data = pd.concat([current_data, missing_virtual_drop_data], ignore_index=True).dropna(
+            how='any').drop_duplicates()
 
         total_data.to_csv(record_file_path, encoding='utf-8', index=False,
                           columns=['coin_name', 'spider_web', 'frequency', 'time'], date_format='%Y-%m-%d %H:%M:%S')
 
-
-        current_data = current_data[['coin_name', 'spider_web', 'frequency', 'virtual_drop_A', 'virtual_drop_B']].drop_duplicates()
+        current_data = current_data[
+            ['coin_name', 'spider_web', 'frequency', 'virtual_drop_A', 'virtual_drop_B']].drop_duplicates()
         return current_data
 
     def hour_func_1_base(self):
@@ -174,7 +173,8 @@ class HourlyFunctionHandler(FunctionHandler):
             group, 'close', 'gt'), include_groups=False)
         A_close_gt_B_close_data = A_close_gt_B_close_data.dropna().reset_index(drop=False).drop(columns='level_2')
 
-        filtered_B_data = self.filter_B_data_with_following_conditions(A_close_gt_B_close_data.copy(), range_A_to_B_data.copy())
+        filtered_B_data = self.filter_B_data_with_following_conditions(A_close_gt_B_close_data.copy(),
+                                                                       range_A_to_B_data.copy())
 
         if filtered_B_data.empty:
             filtered_B_data = pd.DataFrame(
@@ -184,14 +184,16 @@ class HourlyFunctionHandler(FunctionHandler):
                          'change_B', 'amplitude_B', 'virtual_drop_B'])
 
         # 将C时刻数据与AB范围内的数据合并，C时刻数据后缀为'_C'
-        change_lt_0_data = change_lt_0_data.rename(columns={col : f'{col}_C' if col != 'coin_name' and col != 'spider_web' else col for col in change_lt_0_data.columns})
+        change_lt_0_data = change_lt_0_data.rename(
+            columns={col: f'{col}_C' if col != 'coin_name' and col != 'spider_web' else col for col in
+                     change_lt_0_data.columns})
         merged_ABC_data = filtered_B_data.merge(change_lt_0_data, on=['coin_name', 'spider_web'],
-                                                        how='inner', suffixes=('', '_C'))
+                                                how='inner', suffixes=('', '_C'))
 
         # C时刻收盘价同时小于A的最低价和B的最低价。
 
-        C_close_lt_A_low_and_B_low_condition = (merged_ABC_data['close_C'] < merged_ABC_data['low_A']) & (
-                merged_ABC_data['close_C'] < merged_ABC_data['low_B'])
+        C_close_lt_A_low_and_B_low_condition = (merged_ABC_data['close_C'] <= merged_ABC_data['low_A']) & (
+                merged_ABC_data['close_C'] <= merged_ABC_data['low_B'])
         C_close_lt_A_low_and_B_low_data = merged_ABC_data[C_close_lt_A_low_and_B_low_condition]
 
         self.price_comparison_results['hour_func_1_base'] = C_close_lt_A_low_and_B_low_data.copy()
@@ -218,9 +220,8 @@ class HourlyFunctionHandler(FunctionHandler):
 
         # 进行条件筛选
         condition_1 = (
-                    func_1_base_data['close_C'] <= func_1_base_data['min_low_in_AB'] * Decimal(CLOSE_PRICE_THRESHOLD))
+                func_1_base_data['close_C'] <= func_1_base_data['min_low_in_AB'] * Decimal(CLOSE_PRICE_THRESHOLD))
         condition_1_data = func_1_base_data[condition_1]
-
 
         send_data = self.record_coin_frequency_and_virtual_drop(record_file_path, condition_1_data.copy())
 
@@ -253,34 +254,49 @@ class HourlyFunctionHandler(FunctionHandler):
         """
         logger.info("开始执行函数1条件2")
         config = self.config.get(f'{self.apply_condition_2_to_func_1_base.__name__}')
-
         base_data = self.price_comparison_results['hour_func_1_base'].copy()
+        with open(os.path.join(PROJECT_ROOT_PATH, 'data', 'binance_coins_USDT.csv'), 'r') as file:
+            BINANCE_COINS = file.read().splitlines()
 
         if base_data.empty:
             return
 
-        A_to_now_data = self.get_range_data_hours((self.datetime - timedelta(hours=6)).replace(minute=0), self.datetime,
+        total_data = self.get_range_data_hours(start_datetime=self.datetime - timedelta(hours=24),
+                                               end_datetime=self.datetime, inclusive='both')
+        total_data = total_data.merge(base_data[['coin_name', 'spider_web']].drop_duplicates(),
+                                      on=['coin_name', 'spider_web'], how='inner')
+
+        A_to_now_data = self.get_range_data_hours((self.datetime - timedelta(hours=6)), self.datetime,
                                                   'left')
         A_to_now_data = self.csv_reader.change_column_type_to_Decimal(A_to_now_data, False)
         # biance网站的数据
-        binance_data = base_data[base_data['spider_web'] == 'binance']
-        binance_coins = binance_data['coin_name'].unique()
+        binance_data = base_data[base_data['coin_name'].isin(BINANCE_COINS)]
         conform_condition_binance_data = self.filter_change_virtual_drop_or_change_price_by_spider_web('binance',
                                                                                                        binance_data.copy(),
                                                                                                        A_to_now_data.copy(),
                                                                                                        config)
 
+        international_change_binance_data = self.filter_by_international_change('binance', binance_data.copy(),
+                                                                                total_data.copy(), config=config)
+
         # 其他网站数据
-        other_data = base_data[(base_data['spider_web'] != 'binance') & (~base_data['coin_name'].isin(binance_coins))]
+        other_data = base_data[~base_data['coin_name'].isin(BINANCE_COINS)]
         conform_condition_other_data = self.filter_change_virtual_drop_or_change_price_by_spider_web('other',
                                                                                                      other_data.copy(),
                                                                                                      A_to_now_data.copy(),
                                                                                                      config)
+
+        international_change_other_data = self.filter_by_international_change('other', other_data.copy(),
+                                                                              total_data.copy(), config)
+
         conform_condition_1_and_2_data = pd.concat([conform_condition_binance_data, conform_condition_other_data],
                                                    ignore_index=True)
+        conform_international_change_data = pd.concat(
+            [international_change_binance_data, international_change_other_data], ignore_index=True)
 
         conform_condition_1_and_2_data.drop_duplicates(subset=['coin_name', 'spider_web'], inplace=True, keep='first')
-
+        conform_condition_1_and_2_data = conform_condition_1_and_2_data.merge(
+            conform_international_change_data[['coin_name', 'spider_web']].drop_duplicates(), on=['coin_name', 'spider_web'], how='inner')
         if conform_condition_1_and_2_data.empty:
             return
 
@@ -288,7 +304,7 @@ class HourlyFunctionHandler(FunctionHandler):
 
         conform_condition_1_and_2_data.drop_duplicates(subset=['coin_name', 'spider_web'], inplace=True, keep='first')
 
-        self.price_comparison_results['apply_condition_2_to_func_1_base'] = conform_condition_1_and_2_data.copy()
+        self.price_comparison_results[f'{self.apply_condition_2_to_func_1_base.__name__}'] = conform_condition_1_and_2_data.copy()
 
         conform_condition_1_and_2_data = self.round_and_simple_data(conform_condition_1_and_2_data)
 
@@ -296,18 +312,48 @@ class HourlyFunctionHandler(FunctionHandler):
         logger.info("函数1条件2执行完毕" + '\n' + conform_condition_1_and_2_data.to_string(index=False))
 
 
+    def add_filte_in_minute_and_hour(self):
+        """
+        1.以分钟为单位的函数：每一个时刻的C价格 <= 上一个C时刻价格的99%
+        2.以小时为单位的函数：每一个时刻的C价格 <= 上一个C时刻价格的99%
+
+        表中同一个AB时刻的同一币种出现次数最大为5次。
+        对于一个币种，记录的时间跨度最多为23小时。超过23小时则删除该条件记录。
+        columns = coin_name spider_web time_A time_B lasted_price_C_minute lasted_price_C_hour first_record_time  cnt
+        :return:
+        """
+        logger.info('开始执行每分钟函数3：add_filte_in_minute_and_hour')
+        minute_and_hour_cnt_file_path = os.path.join(PROJECT_ROOT_PATH, 'function_handler', 'record_data',
+                                                     'minute_and_hour_cnt_le5.csv')
+        data = self.price_comparison_results[f'{self.apply_condition_2_to_func_1_base.__name__}'].copy()
+
+        if data.empty:
+            logger.info("数据为空,结束函数")
+            return
+
+        result_data = self.filter_by_hour_and_minute(data, 'hour', minute_and_hour_cnt_file_path)
+
+        if result_data is None or result_data.empty:
+            logger.info("无结果")
+            return
+        self.price_comparison_results[f'{self.add_filte_in_minute_and_hour.__name__}'] = result_data.copy()
+        send_email("[小时]小时-分钟记录——V1", result_data.to_string(index=False), False)
+
+
 if __name__ == "__main__":
     csv_reader = CSVReader(data_region='China')
 
-    data = pd.read_csv(r"D:\PythonCode\virtual_currency-3.0\test\test.csv")
+    data = pd.read_csv(r"D:\PythonCode\virtual_currency-3.0\data\China\2024-12\5.csv")
     data = csv_reader.change_column_type_to_Decimal(data, only_price=False)
     data['time'] = pd.to_datetime(data['time'])
+    cur_datetime = datetime(2024,12,5,18,0,0)
+    data = data[data['time'] == cur_datetime]
     configHandler = ConfigHandler(file_path=rf'{os.path.join(PROJECT_ROOT_PATH, "config.xml")}')
     configHandler.load_config()
-    hourly_function_hander = HourlyFunctionHandler(reader=csv_reader, datetime=datetime(2024, 11, 7, 0, 0, 0),
+    hourly_function_hander = HourlyFunctionHandler(reader=csv_reader, datetime=cur_datetime,
                                                    data=data, config=configHandler.config.get('hour_function'))
 
-    hourly_function_hander.get_range_data_hours(datetime(2024, 11, 6, 0, 0, 0), datetime(2024, 11, 7, 0, 0, 0),
+    hourly_function_hander.get_range_data_hours(cur_datetime - timedelta(hours=24), cur_datetime,
                                                 inclusive='left')
     hourly_function_hander.hour_func_1_base()
     hourly_function_hander.apply_condition_1_to_func_1_base()

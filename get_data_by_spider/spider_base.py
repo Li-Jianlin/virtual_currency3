@@ -27,7 +27,7 @@ class Spider:
     """
     def __init__(self, spider_web: str):
         self.spider_web = spider_web
-        self.headers = {'User-Agent': random.choice(get_random_user_agents())}
+        self.headers = {'User-Agent': get_random_user_agents()}
         self.coins: list = []
         self.prices: list = []
 
